@@ -30,7 +30,7 @@ const link = createDeviceLink({
   getSession: async () => currentFlixSessionToken,
   hasConsent: () => diagnosticSharingEnabled
 });
-await link.report({ state: 'ok', code: 'startup', message: 'Started' });
+await link.report({ state: 'ready', code: 'startup', message: 'Started' });
 const release = await link.latest();
 ```
 
