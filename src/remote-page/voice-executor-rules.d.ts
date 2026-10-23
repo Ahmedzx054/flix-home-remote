@@ -1,0 +1,1 @@
+export function createVoiceExecutor(tv:Record<string,(...args:any[])=>Promise<any>>,options:{house:string;houseJson:(route:string,timeout?:number)=>Promise<any>;log?:(event:any)=>void}):{run(text:string,host:string):Promise<any>};

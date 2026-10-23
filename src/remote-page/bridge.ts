@@ -10,12 +10,8 @@ export interface PageHost {
  record(path:string,ok:boolean,message:string,deviceId:string):void;
 }
 export const pageKeys:Record<string,Command>={UP:'up',DOWN:'down',LEFT:'left',RIGHT:'right',ENTER:'ok',BACK:'back',HOME:'home',MENU:'settings',VOLUMEUP:'volumeUp',VOLUMEDOWN:'volumeDown',MUTE:'mute',PLAY:'playPause',PAUSE:'pause',REWIND:'rewind',FASTFORWARD:'fastForward',INFO:'info',EXIT:'exit',CHANNELUP:'channelUp',CHANNELDOWN:'channelDown'};
-export function resolveShortcut(id:string,apps:TvApp[]){
- const exact=apps.find(a=>a.id===id);if(exact)return exact.id;
- const aliases:Record<string,RegExp>={netflix:/netflix|نتفلكس/i,'youtube.leanback.v4':/youtube|يوتيوب/i,'com.apple.appletv':/apple\s*tv|أبل تي/i,'net.mbc.shahid-lgapp':/shahid|شاهد/i,'com.netflixfree.s.cloud':/flix\s*s\b|فلكس\s*(اس|إس)/i,'com.netflixfree.f.cloud':/flix\s*f\b|فلكس\s*(اف|إف)/i,'com.netflixfree.tv.cloud':/flix.*iptv|فلكس.*آي بي/i};
- const pattern=aliases[id],matches=pattern?apps.filter(a=>pattern.test(a.label)):[];
- if(matches.length!==1)throw Error(matches.length?'يوجد أكثر من تطبيق مطابق؛ اختر التطبيق من قائمة التلفزيون.':'التطبيق غير موجود في القائمة التي أعادها التلفزيون.');return matches[0].id;
-}
+export {resolveShortcut} from './shortcuts.ts';
+import {resolveShortcut} from './shortcuts.ts';
 export function createPageBridge(h:PageHost){
  let scanning:Promise<any>|undefined;
  const events:{at:string;action:string;ok:boolean;ms:number;why:string}[]=[];
@@ -33,7 +29,7 @@ export function createPageBridge(h:PageHost){
    }
    if(action==='/api/televisions'){return{ok:true,televisions:(await list()).map(d=>({...d,kind:d.platform,canWake:false}))};}
    if(action==='/api/versions'){return{ok:true,builds:[{label:'ريموت FLIX',platform:'iPhone · Android',version:VERSION,updated:BUILD_ID}]};}
-   if(action==='/api/monitor'){const failed=events.filter(e=>!e.ok);return{ok:true,commands:events.length,failed:failed.length,causes:failed.slice(-5).map(e=>({count:1,why:e.why,did:'افتح حساب FLIX والدعم لمشاركة التشخيص'})),recent:events.slice(-30).reverse()};}
+   if(action==='/api/monitor'){const failed=events.filter(e=>!e.ok),times=events.map(e=>e.ms).sort((a,b)=>a-b);return{ok:true,commands:events.length,failed:failed.length,median:times.length?times[Math.floor(times.length/2)]:0,slowest:times.at(-1)||0,causes:failed.slice(-5).map(e=>({count:1,why:e.why,did:'افتح حساب FLIX والدعم لمشاركة التشخيص'})),recent:events.slice(-30).reverse()};}
    const d=await target(body.host||url.searchParams.get('host')||undefined);deviceId=d.id;chosen=d;
    if(method!=='GET')h.select(d.id);
    const call=<T>(operation:string,data?:unknown,verb='POST')=>h.api<T>(path(d)+'/'+operation,verb,data);
@@ -49,26 +45,25 @@ export function createPageBridge(h:PageHost){
    else if(action==='/api/power-off')await call('command',{command:'powerOff'});
    else if(action==='/api/power-on')throw Error('تشغيل الشاشة من الاستعداد يحتاج دعم Wake-on-LAN وعنوانها المادي وإذن الشبكة؛ شغّلها بريموتها حاليًا.');
    else if(action==='/api/launch'){const apps=await call<{apps:TvApp[]}>('apps',undefined,'GET');await call('launch',{appId:resolveShortcut(String(body.id),apps.apps)});}
-   else if(action==='/api/settings'){const r=await call<any>('settings',undefined,'GET');const wanted=String(body.page||'open');await call('settings',{id:r.settings.some((s:any)=>s.id===wanted)?wanted:'open'});}
+   else if(action==='/api/settings')await operation('open-settings',{page:body.page});
    else if(['/api/move','/api/scroll','/api/click','/api/type','/api/input','/api/open-in-app'].includes(action)){const result=await operation(action.slice(5));h.record(action,result?.ok!==false,String(result?.message||method),deviceId);return{ok:true,...result};}
    else if(action==='/api/inputs')return{ok:true,...await operation('inputs')};
    else if(action==='/api/sound')return{ok:true,...await operation('sound',method==='GET'?{}:body)};
    else if(action==='/api/picture')return{ok:true,...await operation('picture',method==='GET'?{}:body)};
    else if(action==='/api/bluetooth')return{ok:true,...await operation('bluetooth',method==='GET'?{}:body)};
    else if(action==='/api/sound-output-set')return{ok:true,...await operation('sound',{output:body.output})};
-   else if(action==='/api/voice'){
-    const text=String(body.text||'').trim();const keys:Record<string,Command>={'ارفع الصوت':'volumeUp','خفض الصوت':'volumeDown','كتم':'mute','رجوع':'back','الرئيسية':'home','يمين':'right','يسار':'left','فوق':'up','تحت':'down','توقف':'pause','شغل':'play','القناة التالية':'channelUp'};
-    if(keys[text])await call('command',{command:keys[text]});
-    else {const apps=await call<{apps:TvApp[]}>('apps',undefined,'GET');const search=text.replace(/^(افتح|شغل|شغّل)\s+/,'').toLowerCase();const app=apps.apps.find(a=>a.label.toLowerCase()===search);if(app)await call('launch',{appId:app.id});else throw Error('اكتب اسم تطبيق مثبت كما يظهر في قائمته، أو أمرًا مثل «ارفع الصوت». البحث عن المحتوى من اكسبلور.');}
-    return{ok:true,message:'أُرسل الطلب إلى '+d.name,said:text};
-   }
+   else if(action==='/api/keep-awake')return{ok:true,...await operation('keep-awake')};
+   else if(action==='/api/voice')return operation('voice');
    else if(action==='/api/title-progress'||action==='/api/continue'){
     const id=action==='/api/title-progress'?url.searchParams.get('id')||'':'';
-    const r=await operation('history',{id});
+    const r=await operation('history',{id,app:url.searchParams.get('app')||'s'});
     if(id)return{ok:true,connected:true,entries:r.entries};
-    return{ok:true,app:url.searchParams.get('app')||'s',cards:r.entries.map((e:any)=>({...e,label:e.title,poster:e.poster?.startsWith('/')?'https://image.tmdb.org/t/p/w342'+e.poster:e.poster,path:e.type==='tv'?'/tv/'+e.id+'/watch?s='+(e.season||1)+'&e='+(e.episode||1):'/movie/'+e.id+'/watch'}))};
+    return{ok:true,app:url.searchParams.get('app')||'s',cards:r.entries.filter((e:any)=>e.id&&e.title).map((e:any)=>({...e,series:e.type==='tv',app:url.searchParams.get('app')||'s',done:e.completed,label:e.type==='tv'?'م '+e.season+' · ح '+e.episode:'فيلم',poster:e.poster?.startsWith('/')?'https://image.tmdb.org/t/p/w342'+e.poster:e.poster,path:e.type==='tv'?'/tv/'+e.id+'/watch?s='+(e.season||1)+'&e='+(e.episode||1):'/movie/'+e.id+'/watch'}))};
    }
-   else if(action==='/api/stats')throw Error('إحصاءات مستخدمي فلكس تتطلب حساب الإدارة؛ سجل الشاشة المحددة متاح من المتابعة.');
+   else if(action==='/api/stats'){
+    const r=await operation('history',{}),rows=Array.isArray(r.entries)?r.entries:[],now=Date.now();
+    return{ok:true,scopeText:'من سجل الشاشة المحددة: '+d.name+'؛ يعرض التقدم المحفوظ ولا يقيس وقت المشاهدة الفعلي أو إحصاءات بقية الحسابات.',devices:1,televisions:1,activeToday:rows.some((e:any)=>now-e.at<86400000)?1:0,activeWeek:rows.some((e:any)=>now-e.at<604800000)?1:0,movies:rows.filter((e:any)=>e.type==='movie').length,series:rows.filter((e:any)=>e.type==='tv').length,seconds:rows.reduce((n:number,e:any)=>n+Math.max(0,e.currentTime||0),0),recording:true,watched:rows.slice(0,30).map((e:any)=>({...e,device:d.name,seconds:e.currentTime,at:e.at?new Date(e.at).toISOString():''}))};
+   }
    else throw Error('الوظيفة غير متاحة عبر بروتوكول هذه الشاشة. أرسل التشخيص من حساب FLIX والدعم.');
    h.record(action,true,method,deviceId);events.push({at:new Date().toISOString(),action,ok:true,ms:Date.now()-started,why:''});if(events.length>80)events.shift();return{ok:true};
   }catch(error){const message=error instanceof Error?error.message:'تعذر الاتصال';h.record(action,false,message,deviceId);events.push({at:new Date().toISOString(),action,ok:false,ms:Date.now()-started,why:message});if(events.length>80)events.shift();return{ok:false,error:'phone_direct',message,...(action==='/api/picture'?{lg:chosen?.platform==='webos',paired:false,pairingError:message}:{})};}

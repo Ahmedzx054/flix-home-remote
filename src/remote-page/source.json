@@ -1,8 +1,14 @@
 {
   "source": "local_apps/flix-s/tools/tv-remote.html",
   "sourceSha256": "4774784cbf314488eca3b3fead9241339836c5e3e66655c86d9fbdb0e203b769",
-  "bundledSha256": "4e7847c38869304c1a26a809eb6b2539eff2f73e9191096d6daacaac4e1da54b",
+  "bundledSha256": "8367995d7efa294859acc6c9de327a6168ca87f7ad010997691364d5a1418ac5",
   "pictureSourceSha256": "4d341d0dfe5b36ad3c9a6d4a24a1023b65042564b1f2e42425a0f3699a5eb0f8",
   "pictureBundledSha256": "b6b972a2ab4896b36319cd3a442daee309b4b08b6c09918bd0b051c8e3d70b1a",
-  "bluetoothBundledSha256": "242c2c01315ddf774984f3922c099a8cfc2a105d8998d80cedea243fff63b93c"
+  "bluetoothBundledSha256": "242c2c01315ddf774984f3922c099a8cfc2a105d8998d80cedea243fff63b93c",
+  "keep-awakeBundledSha256": "0d34cc74bebcf24aefc338d18d443da48bad780b1756126409466b5ba24b596a",
+  "voice-commandsBundledSha256": "8a22197c8b1ae0f3bd62f06bf0f94b980127fe3bb738d948189fccb4e0e67bd5",
+  "voice-executorBundledSha256": "7f58607b08baa999784384b93bc25799f8eed5d1f6575b6e41574a8b310f9fcb",
+  "keepAwakeSourceSha256": "2225c76c1ca54582afaf20d742a0678fcf19c6d464c2fdf89250c9ba94d6cf8d",
+  "voiceCommandsSourceSha256": "9d5613d60dd0c7b66e45ae2c668cce5317831b31e3cef2233c844a66050eaf9b",
+  "voiceExecutorSourceSha256": "2f3c66560b75a9fb56457c868f1ed3842d255cc40e83f910a31b6e6cf2636635"
 }

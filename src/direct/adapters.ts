@@ -4,7 +4,11 @@ import type { DirectStore as Store } from './engine.ts';
 import { TvSocket } from './socket.ts';
 import { executeAndroid as runTool } from './adb.ts';
 import { androidAppMetadata, clearAndroidAppMetadata } from './android-apps.ts';
-import {inFlix,navigateExpression,textExpression,historyExpression} from './flix-debug.ts';
+import {inFlix,pressInFlix,navigateExpression,textExpression,historyExpression} from './flix-debug.ts';
+import {keepAwakeExpression,KEEP_AWAKE_STATE} from '../remote-page/keep-awake-rules.js';
+import {createVoiceExecutor} from '../remote-page/voice-executor-rules.js';
+import {resolveShortcut} from '../remote-page/shortcuts.ts';
+import {catalogueJson} from '../remote-page/cloud.ts';
 import {BLUETOOTH_ADDRESS,BLUETOOTH_OPS,bluetoothExpression,bluetoothListing,bluetoothMessage} from '../remote-page/bluetooth-rules.js';
 import { PICTURE_KEYS, SOUND_KEYS, SOUND_MODES, readCategory, writeCategory, describePicture, presetSettings, luminanceSettings, modeValue } from '../remote-page/picture-rules.js';
 const androidSerial=(host: string,port=5555)=>`${host}:${port}`;
@@ -23,6 +27,7 @@ export class Adapters {
   private pointers = new Map<string, TvSocket>();
   private opening = new Map<string, Promise<TvSocket>>();
   private bluetoothBusy=new Set<string>();
+  private voices=new Map<string,ReturnType<typeof createVoiceExecutor>>();
   constructor(private store: Store, private execute = runTool, private makeSocket = (url: string) => new TvSocket(url)) {}
   close() { this.sessions.forEach(s => s.close()); this.pointers.forEach(s => s.close()); clearAndroidAppMetadata(); }
   private serial(d: Device) { return androidSerial(d.host, d.port); }
@@ -78,6 +83,13 @@ export class Adapters {
     if (d.platform === 'roku') { const key = rokuKeys[command]; if (!key) throw new Error('هذا الزر غير متاح.'); await tvFetch(d.host, 8060, '/keypress/' + key, { method: 'POST' }); return; }
     const s = await this.socket(d);
     if (d.platform === 'tizen') { await s.write(JSON.stringify({ method: 'ms.remote.control', params: { Cmd: 'Click', DataOfCmd: samsungKeys[command], Option: 'false', TypeOfRemote: 'SendRemoteKey' } })); return; }
+    if(['up','down','left','right','ok','back'].includes(command)){
+      const front=await this.activity(d).catch(()=>null);
+      if(front?.appId?.startsWith('com.netflixfree.')){
+        if(await pressInFlix(d,command))return;
+        if(command==='back')throw Error('صفحة فلكس لا تجيب على الرجوع؛ أعد الاتصال لتجنب إغلاق التطبيق بالخطأ.');
+      }
+    }
     const button = lgButtons[command];
     if (button) {
       let pointer = this.pointers.get(d.id);
@@ -102,7 +114,45 @@ export class Adapters {
       else {const socket=await this.socket(d);if(d.platform==='webos')await socket.request('ssap://audio/getVolume');}
       return {connected:true};
     }
-    if(operation==='history')return {entries:await inFlix(d,historyExpression(String(data.id||'')))};
+    if(operation==='history')return {entries:await inFlix(d,historyExpression(String(data.id||'')),data.app==='f'?'com.netflixfree.f.':data.app==='s'?'com.netflixfree.s.':undefined)};
+    if(operation==='voice'){
+      let voice=this.voices.get(d.id);
+      if(!voice){
+        const keys:Record<string,Command>={UP:'up',DOWN:'down',LEFT:'left',RIGHT:'right',ENTER:'ok',BACK:'back',HOME:'home',VOLUMEUP:'volumeUp',VOLUMEDOWN:'volumeDown',MUTE:'mute',PLAY:'playPause',PAUSE:'pause',REWIND:'rewind',FASTFORWARD:'fastForward',INFO:'info',EXIT:'exit',CHANNELUP:'channelUp',CHANNELDOWN:'channelDown'};
+        const ssap=async(_host:string,uri:string,payload?:any)=>{
+          if(d.platform!=='webos'||!['ssap://audio/getVolume','ssap://audio/setVolume','ssap://audio/setMute'].includes(uri))throw Error('قياس الصوت غير متاح في هذا البروتوكول.');
+          if(uri.endsWith('setVolume')){if(!Number.isInteger(payload?.volume)||payload.volume<0||payload.volume>100)throw Error('مستوى صوت غير صالح.');}
+          if(uri.endsWith('setMute')&&typeof payload?.mute!=='boolean')throw Error('قيمة كتم غير صالحة.');
+          return (await this.socket(d)).request(uri,payload);
+        };
+        voice=createVoiceExecutor({
+          press:async(name:string)=>{if(!keys[name])throw Error('زر غير معروف.');return this.command(d,keys[name]);},
+          launch:async(id:string)=>this.launch(d,resolveShortcut(id,await this.apps(d))),
+          switchInput:async(id:string)=>this.setSetting(d,'input',id),
+          openSettings:async(page:string)=>this.pageOperation(d,'open-settings',{page}),
+          powerOff:async()=>this.command(d,'powerOff'),
+          wake:async()=>{throw Error('تشغيل التلفزيون من الاستعداد يحتاج إعداد Wake-on-LAN وعنوان MAC؛ استخدم ريموته حاليًا.');},
+          evaluate:async(expression:string)=>{try{return{ok:true,value:await inFlix(d,expression)};}catch(error){return{ok:false,error:error instanceof Error?error.message:'تعذر الاتصال بفلكس'};}},
+          openInApp:async(order:any)=>this.pageOperation(d,'open-in-app',{app:order.appId,path:order.path,play:order.wantsPlay}),
+          setSearchText:async(text:string)=>{const r=await inFlix(d,textExpression(text,true));return r?.ok?'page':'none';},
+          ssap,toast:async(_host:string,message:string)=>{if(d.platform==='webos')await (await this.socket(d)).request('ssap://system.notifications/createToast',{message:String(message).slice(0,240)});}
+        },{house:'https://flix-s-neon.vercel.app',houseJson:catalogueJson});
+        this.voices.set(d.id,voice);
+      }
+      return voice.run(String(data.text||''),d.host);
+    }
+    if(operation==='open-settings'){
+      const page=String(data.page||'all');
+      if(d.platform==='webos')return (await this.socket(d)).request('ssap://system.launcher/launch',{id:'com.palm.app.settings',params:['picture','sound','network','general'].includes(page)?{target:page}:{}});
+      const id=page==='picture'?'display':page;
+      return this.setSetting(d,d.platform==='android'&&androidSettings[id]?id:'open');
+    }
+    if(operation==='keep-awake'){
+      if(d.platform!=='webos')throw Error('منع شاشة التوقف متاح داخل فلكس على webOS مع قناة المطور.');
+      const on=data.on===true;
+      const expression=`Promise.resolve(${keepAwakeExpression(on)}).then(function(r){if(!${on})return {keepAwake:false,live:r};return new Promise(function(resolve,reject){var n=0,t=setInterval(function(){if(window.__flixKeepAwakeError){clearInterval(t);reject(new Error(window.__flixKeepAwakeError));}else if(window.__flixKeepAwakeReady){clearInterval(t);resolve({keepAwake:true,live:r});}else if(++n>=12){clearInterval(t);try{window.__flixKeepAwake.cancel();}catch(e){}window.__flixKeepAwake=null;reject(new Error('التلفزيون لم يؤكد إذن منع شاشة التوقف.'));}},250);});})`;
+      return inFlix(d,expression,undefined,true,8000);
+    }
     if(operation==='bluetooth'){
       if(d.platform!=='webos')throw Error('البروتوكول لا يكشف أجهزة Bluetooth. افتح إعدادات Bluetooth على التلفزيون.');
       const op=String(data.op||'status'),address=String(data.address||'').toLowerCase();
@@ -150,9 +200,34 @@ export class Adapters {
       safeAppId(String(data.app));let path=String(data.path||'');navigateExpression(path);
       if(d.platform!=='webos')throw Error('فتح التطبيق متاح؛ فتح محتوى فلكس داخله يحتاج قناة روابط يدعمها إصدار التلفزيون.');
       if(!String(data.app).startsWith('com.netflixfree.'))throw Error('فتح المحتوى مخصص لتطبيقات فلكس.');
-      const front=await this.activity(d);if(front.appId!==data.app){await this.launch(d,data.app);throw Error('فُتح التطبيق المطلوب؛ انتظر اكتمال فتحه ثم اختر المحتوى مرة ثانية.');}
-      if(data.play===true){if(/^\/movie\/\d+$/.test(path))path+='/watch';else if(/^\/tv\/\d+$/.test(path)){const id=path.split('/')[2];const entries=await inFlix(d,historyExpression(id),data.app);const last=entries?.[0];path+='/watch?s='+(last?.season||1)+'&e='+(last?.episode||1);}}
-      return inFlix(d,navigateExpression(path),data.app);
+      const apps=await this.apps(d),app=resolveShortcut(String(data.app),apps);safeAppId(app);
+      const front=await this.activity(d);if(front.appId!==app)await this.launch(d,app);
+      let ready=false;
+      for(let attempt=0;attempt<8;attempt++){
+        if(attempt)await new Promise(r=>setTimeout(r,600));
+        const active=await this.activity(d);if(active.appId!==app)continue;
+        try{await inFlix(d,'1',app);ready=true;break;}catch{/* The TV may still be loading its FLIX iframe. */}
+      }
+      if(!ready)throw Error('فُتح التطبيق لكن قناة محتواه لم تجهز بعد؛ أبقه مفتوحًا ثم اختر المحتوى مجددًا.');
+      let pressAfter='';
+      if(data.play===true){
+        if(/^\/movie\/\d+$/.test(path))path+='/watch';
+        else if(/^\/tv\/\d+$/.test(path)){
+          const id=path.split('/')[2],entries=await inFlix(d,historyExpression(id),app),last=entries?.find((e:any)=>e.season&&e.episode);
+          if(last?.completed)pressAfter='[data-detail-action="watch"]';
+          else path+='/watch?s='+(last?.season||1)+'&e='+(last?.episode||1);
+        }else if(/^\/faselhd\?(?:.*&)?detail=\d+/.test(path))pressAfter='[data-fasel-hero-play="true"]';
+      }
+      const result=await inFlix(d,navigateExpression(path),app);
+      if(pressAfter){
+        for(let attempt=0;attempt<12;attempt++){
+          await new Promise(r=>setTimeout(r,500));
+          const clicked=await inFlix(d,`(function(){var e=document.querySelector(${JSON.stringify(pressAfter)});if(!e||e.disabled||e.getAttribute('aria-busy')==='true')return false;e.click();return true;})()`,app).catch(()=>false);
+          if(clicked)return {...result,ok:true,did:'open-in-app'};
+        }
+        throw Error('فُتحت صفحة العنوان؛ زر المتابعة لم يجهز بعد. اضغط تشغيل على التلفزيون أو أعد الاختيار.');
+      }
+      return result;
     }
     if(operation==='sound'||operation==='picture') {
       if(d.platform!=='webos')return {ok:false,lg:false,message:'البروتوكول لا يعيد هذه القيم؛ افتح الإعدادات على التلفزيون.'};
@@ -175,7 +250,9 @@ export class Adapters {
           if(missed.length)throw Error('التلفزيون لم يؤكد تعديل: '+missed.join(', '));
           return {lg:true,paired:true,picture:describePicture(after),wrote:write,missed:[]};
         }
-        return {lg:true,paired:true,picture:describePicture(current)};
+        let keepAwake=false;
+        try{const state=await inFlix(d,KEEP_AWAKE_STATE,undefined,true,3000);keepAwake=!!JSON.parse(state).on;}catch{/* TV settings work even when FLIX inspector is unavailable. */}
+        return {lg:true,paired:true,keepAwake,picture:describePicture(current)};
       }
       if(data.volume!==undefined)await this.setSetting(d,'volume',Number(data.volume));
       if(data.step!==undefined){const r=await socket.request('ssap://audio/getVolume'),v=Number((r.volumeStatus||r).volume);if(!Number.isFinite(v))throw Error('لم يعد التلفزيون مستوى الصوت.');await this.setSetting(d,'volume',Math.max(0,Math.min(100,v+Number(data.step))));}
