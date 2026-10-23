@@ -134,6 +134,18 @@ class SourceBundleTests(unittest.TestCase):
 
 
 class NativeBridgeWiringTests(unittest.TestCase):
+    def test_private_tv_ca_exceptions_are_limited_to_literal_local_ranges(self):
+        import ipaddress
+        info = plistlib.loads((ROOT / 'ios/App/App/Info.plist').read_bytes())
+        ats = info['NSAppTransportSecurity']
+        self.assertNotIn('NSAllowsArbitraryLoads', ats)
+        self.assertNotIn('NSAllowsArbitraryLoadsInWebContent', ats)
+        self.assertTrue(ats['NSAllowsLocalNetworking'])
+        self.assertEqual(set(ats['NSExceptionDomains']), {'10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '169.254.0.0/16'})
+        for network, policy in ats['NSExceptionDomains'].items():
+            self.assertTrue(ipaddress.ip_network(network).is_private)
+            self.assertEqual(policy, {'NSExceptionAllowsInsecureHTTPLoads': True})
+
     def test_both_ios_startup_paths_register_the_direct_phone_plugins(self):
         app = ROOT / 'ios/App/App'
         info = plistlib.loads((app / 'Info.plist').read_bytes())

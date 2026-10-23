@@ -40,7 +40,7 @@ export async function scanDirect() {
       const identified=await identifyTelevision(entry,async url=>decodeDescription((await Lan.http({url,limit:131072})).data));
       if(!identified)continue;seen.add(host);const {name,model,platform}=identified;
       const previous=directStore.data.devices.find(d=>d.host===host);
-      if(previous){previous.seenAt=Date.now();if(previous.platform==='android'&&!previous.paired&&entry.service?.includes('adb-tls-connect')&&entry.port)previous.port=entry.port;if(previous.platform==='unknown')previous.platform=platform;}
+      if(previous){previous.seenAt=Date.now();if(previous.platform==='android'&&!previous.paired&&entry.service?.includes('adb-tls-connect')&&entry.port)previous.port=entry.port;if(previous.platform==='unknown'||!previous.paired&&previous.platform!==platform){previous.platform=platform;previous.name=name;previous.model=model;previous.port=platform==='android'?entry.port||5555:undefined;}}
       else if(directStore.data.devices.length<30)directStore.data.devices.push({id:crypto.randomUUID(),name:name.slice(0,100),model:model.slice(0,100),host,platform,port:platform==='android'?entry.port||5555:undefined,paired:false,seenAt:Date.now()});
     }catch{/* One malformed/blocked discovery response cannot cancel other TVs. */}
   }

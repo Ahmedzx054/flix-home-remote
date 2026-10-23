@@ -7,8 +7,11 @@ const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '' 
 export async function identifyTelevision(entry: Discovery, read: (url: string) => Promise<string>) {
   const host = localHost(entry.host);
   let name = entry.name || host, model = '', description = '';
-  let platform: Platform = entry.platform === 'android' ? 'android' : 'unknown';
-  const location = entry.location || entry.ssdp?.match(/^location:\s*(.+)$/im)?.[1]?.trim();
+  // Cast is also shipped in webOS televisions and speakers; it does not prove ADB.
+  const castOnly = entry.service?.includes('_googlecast.') === true;
+  let platform: Platform = !castOnly && entry.platform === 'android' ? 'android' : 'unknown';
+  const location = entry.location || entry.ssdp?.match(/^location:\s*(.+)$/im)?.[1]?.trim()
+    || (castOnly ? `http://${host}:1387/` : undefined);
   if (location) {
     const url = localUrl(location, host);
     if (!['http:', 'https:'].includes(url.protocol)) throw Error('Invalid description URL');
@@ -30,7 +33,7 @@ export async function identifyTelevision(entry: Discovery, read: (url: string) =
   if (/webos|lg electronics|lge\.com/.test(identity)) platform = 'webos';
   else if (/samsung|tizen/.test(identity)) platform = 'tizen';
   else if (/roku/.test(identity)) platform = 'roku';
-  else if (/android|google\s*tv|googlecast|chromecast/.test(identity)) platform = 'android';
+  else if (/android|google\s*tv/.test(identity)) platform = 'android';
   return platform === 'unknown' ? undefined : { host, name: name.slice(0, 100), model: model.slice(0, 100), platform };
 }
 export const decodeDescription = (data: string) => new TextDecoder().decode(from64(data));

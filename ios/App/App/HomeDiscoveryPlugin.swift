@@ -117,7 +117,9 @@ private final class DirectSessionDelegate: NSObject, URLSessionWebSocketDelegate
     init(opened: @escaping () -> Void, failed: @escaping (String) -> Void) { self.opened = opened; self.failed = failed }
     func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask, didOpenWithProtocol protocol: String?) { opened() }
     func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask, didCloseWith closeCode: URLSessionWebSocketTask.CloseCode, reason: Data?) { failed("TV WebSocket disconnected") }
-    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) { if error != nil { failed("TV connection failed") } }
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        if let error = error as NSError? { failed("TV connection failed (\(error.domain):\(error.code))") }
+    }
     // Only a validated literal LAN TV IP can reach this delegate. Cloud auth uses normal TLS.
     func urlSession(_ session: URLSession, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
         if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust, directLocal(challenge.protectionSpace.host), let trust = challenge.protectionSpace.serverTrust { completionHandler(.useCredential, URLCredential(trust: trust)) }
