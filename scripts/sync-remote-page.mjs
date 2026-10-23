@@ -14,6 +14,7 @@ if(!fs.existsSync(original)) {
 }
 let html=fs.readFileSync(original,'utf8');
 const sourceSha256=crypto.createHash('sha256').update(html).digest('hex');
+html=html.replace(/<!-- FLIX_WEB_ACCOUNT_BEGIN -->[\s\S]*?<!-- FLIX_WEB_ACCOUNT_END -->/g,'');
 const scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
 for(const match of scripts){
  let code=match[1].replace(/\r\n/g,'\n');

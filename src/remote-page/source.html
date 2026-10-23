@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
 <head>
+<meta name="flix-remote-revision" content="e66dfd7bad836431261b41018a94fdeda4ad7495cbd1ab67c10a72a82e9d2942">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#07070b">
@@ -737,6 +738,10 @@ header { gap: 8px; }
 .btscan.on { border-color: hsl(200 90% 60% / 0.6); color: hsl(200 100% 80%); }
 .btscan.on::after { content: ''; width: 8px; height: 8px; margin-inline-start: 8px; border-radius: 50%; background: hsl(200 100% 70%); animation: btping 1s ease-in-out infinite; }
 @keyframes btping { 50% { opacity: 0.2; transform: scale(0.6); } }
+ .remote{gap:5px;padding-block:8px}.title{display:flex;align-items:center;gap:6px}.remote>.deck{flex:1.8 1 0;height:auto;min-height:100px}.remote>.trackpad{flex:1 1 0;min-height:48px}.top button,.navrow button,.icons button{height:clamp(36px,5vh,44px)}.tools .tool{height:44px}.inputs button,.quick button{height:36px;line-height:36px}
+ @media(orientation:landscape) and (max-height:500px){.remote{max-width:850px;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:34px minmax(48px,1fr) 32px 32px 40px 32px 42px;gap:4px;padding:6px}.remote>header{grid-column:1;grid-row:1}.remote>.top{grid-column:2;grid-row:1}.remote>.deck{grid-column:1;grid-row:2 / span 4;min-height:0;height:100%}.remote>.navrow{grid-column:2;grid-row:3}.remote>.trackpad{grid-column:2;grid-row:2;min-height:0}.remote>.icons{grid-column:2;grid-row:4}.remote>.tools{grid-column:2;grid-row:5}.remote>.inputs{grid-column:1;grid-row:6}.remote>.quick{grid-column:2;grid-row:6}.remote>.installer{grid-column:1 / -1;grid-row:7}.remote>.sep{display:none}.top button,.navrow button,.icons button,.inputs button,.quick button{height:32px;line-height:32px}.tools .tool{height:40px}.tvpick{min-height:32px}.edit{width:30px;height:30px}.title .brand{font-size:11px}}
+
+.quick .tv-quick-app img{border-radius:5px;object-fit:contain;flex-shrink:0}.quick .tv-quick-app span{white-space:nowrap}.quick>.empty{min-width:160px;align-self:center;font-size:11px;padding:0 6px}
 </style>
 </head>
 <body>
@@ -885,6 +890,7 @@ header { gap: 8px; }
   </div>
 </div>
 
+
 <script>(() => {
   const dot = document.getElementById("dot");
   const stateText = document.getElementById("stateText");
@@ -923,7 +929,9 @@ header { gap: 8px; }
   };
   let lastConnected = null;
   const setState = (connected) => {
+    const becameConnected = connected === true && lastConnected !== true;
     lastConnected = connected;
+    if (becameConnected) window.dispatchEvent(new CustomEvent("flix-tv-ready"));
     dot.classList.toggle("on", connected === true);
     dot.classList.toggle("bad", connected === false);
     const label = tvLabel();
@@ -1202,8 +1210,10 @@ header { gap: 8px; }
     else localStorage.removeItem("flix-remote-host");
     markPicked();
     if (lastConnected !== null) setState(lastConnected);
+    window.dispatchEvent(new CustomEvent("flix-tv-changed"));
     refresh();
   };
+  window.flixRemote.useHost = useHost;
   window.flixRemote.useHost = useHost;
   document.getElementById("tvPick").addEventListener("click", () => {
     showSheet(true);
@@ -2972,24 +2982,92 @@ header { gap: 8px; }
     }
     for (const node of blocks()) applyScale(node);
   }
+  let tvApps = [], appsHost = "", appsError = "", appsLoading = false, appsGeneration = 0;
+  const selectedAppsHost = () => window.flixRemote?.host() || "";
   function renderApps() {
-    quick.textContent = "";
-    if (!state.apps.length) {
-      const empty = document.createElement("div");
-      empty.className = "empty";
-      empty.textContent = "\u0644\u0627 \u062A\u0637\u0628\u064A\u0642\u0627\u062A \u2014 \u0623\u0636\u0650\u0641 \u0645\u0646 \u0632\u0631 \u0627\u0644\u0642\u0644\u0645";
-      quick.append(empty);
-      return;
-    }
-    for (const app of state.apps) {
-      const button = document.createElement("button");
+    quick.replaceChildren();
+    const refresh = document.createElement("button");
+    refresh.type = "button";
+    refresh.textContent = appsLoading ? "\u2026" : "\u21BB";
+    refresh.title = "\u062A\u062D\u062F\u064A\u062B \u062A\u0637\u0628\u064A\u0642\u0627\u062A \u0627\u0644\u062A\u0644\u0641\u0632\u064A\u0648\u0646";
+    refresh.setAttribute("aria-label", "\u062A\u062D\u062F\u064A\u062B \u062A\u0637\u0628\u064A\u0642\u0627\u062A \u0627\u0644\u062A\u0644\u0641\u0632\u064A\u0648\u0646");
+    refresh.onclick = () => void refreshTvApps();
+    quick.append(refresh);
+    const order = new Map(state.apps.map((a, i) => [a.id, i]));
+    const current = tvApps.slice().sort((a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999));
+    for (const app of current) {
+      const saved = state.apps.find((a) => a.id === app.id), button = document.createElement("button");
       button.dataset.launch = app.id;
-      button.textContent = app.label;
       button.title = app.id;
-      if (app.tone) button.style.color = app.tone;
+      button.classList.add("tv-quick-app");
+      if (app.icon) {
+        const img = document.createElement("img");
+        img.alt = "";
+        img.width = 24;
+        img.height = 24;
+        img.loading = "lazy";
+        img.onerror = () => img.remove();
+        if (window.flixNativePage) {
+          const host2 = appsHost;
+          fetch("/api/app-icon?host=" + encodeURIComponent(host2) + "&appId=" + encodeURIComponent(app.id)).then((r) => r.json()).then((r) => {
+            if (host2 === appsHost && /^data:image\/(png|jpeg|webp|gif);base64,/.test(r.icon || "")) img.src = r.icon;
+            else img.remove();
+          }).catch(() => img.remove());
+        } else {
+          try {
+            const url = new URL(app.icon, "http://" + appsHost);
+            if (["http:", "https:"].includes(url.protocol) && url.hostname === appsHost) img.src = url.href;
+            else img.remove();
+          } catch {
+            img.remove();
+          }
+        }
+        button.append(img);
+      }
+      const name = document.createElement("span");
+      name.textContent = saved?.label || app.label || app.id;
+      button.append(name);
+      if (saved?.tone) button.style.color = saved.tone;
       quick.append(button);
     }
+    if (appsError || !current.length) {
+      const note2 = document.createElement("span");
+      note2.className = "empty";
+      note2.setAttribute("role", "status");
+      note2.textContent = appsError || (appsLoading ? "\u062C\u0627\u0631\u064D \u0642\u0631\u0627\u0621\u0629 \u062A\u0637\u0628\u064A\u0642\u0627\u062A \u0627\u0644\u062A\u0644\u0641\u0632\u064A\u0648\u0646\u2026" : "\u0644\u0645 \u064A\u0631\u062C\u0639 \u0627\u0644\u062A\u0644\u0641\u0632\u064A\u0648\u0646 \u062A\u0637\u0628\u064A\u0642\u0627\u062A\u061B \u0627\u0636\u063A\u0637 \u062A\u062D\u062F\u064A\u062B");
+      quick.append(note2);
+    }
   }
+  async function refreshTvApps() {
+    const host2 = selectedAppsHost(), generation = ++appsGeneration;
+    if (host2 !== appsHost) {
+      tvApps = [];
+      appsHost = host2;
+    }
+    appsError = "";
+    appsLoading = true;
+    renderApps();
+    try {
+      const response = await fetch("/api/apps-on-tv" + (host2 ? "?host=" + encodeURIComponent(host2) : ""), { cache: "no-store" }), payload = await response.json();
+      if (generation !== appsGeneration || host2 !== selectedAppsHost()) return;
+      if (!response.ok || payload.ok === false || payload.error) throw Error(payload.message || payload.error || "\u062A\u0639\u0630\u0631\u062A \u0642\u0631\u0627\u0621\u0629 \u062A\u0637\u0628\u064A\u0642\u0627\u062A \u0627\u0644\u062A\u0644\u0641\u0632\u064A\u0648\u0646");
+      if (!Array.isArray(payload.apps)) throw Error("\u0627\u0644\u062A\u0644\u0641\u0632\u064A\u0648\u0646 \u0644\u0645 \u064A\u0631\u062C\u0639 \u0642\u0627\u0626\u0645\u0629 \u062A\u0637\u0628\u064A\u0642\u0627\u062A \u0635\u0627\u0644\u062D\u0629");
+      tvApps = payload.apps.filter((a) => a && typeof a.id === "string" && a.id).map((a) => ({ id: a.id, label: String(a.label || a.title || a.id), icon: typeof a.icon === "string" ? a.icon : "" }));
+    } catch (error) {
+      if (generation === appsGeneration) appsError = error.message || "\u062A\u0639\u0630\u0631\u062A \u0642\u0631\u0627\u0621\u0629 \u0627\u0644\u062A\u0637\u0628\u064A\u0642\u0627\u062A\u061B \u062C\u0631\u0651\u0628 \u062A\u062D\u062F\u064A\u062B\u0647\u0627 \u0628\u0639\u062F \u0627\u0644\u0627\u0642\u062A\u0631\u0627\u0646";
+    } finally {
+      if (generation === appsGeneration) {
+        appsLoading = false;
+        renderApps();
+      }
+    }
+  }
+  window.addEventListener("flix-tv-changed", () => void refreshTvApps());
+  window.addEventListener("flix-tv-ready", () => void refreshTvApps());
+  setTimeout(() => void refreshTvApps(), 800);
+  setInterval(() => {
+    if (!document.hidden && selectedAppsHost()) void refreshTvApps();
+  }, 6e4);
   quick.addEventListener("click", (event) => {
     if (document.body.classList.contains("editing")) return;
     const button = event.target.closest("button[data-launch]");
@@ -3057,9 +3135,9 @@ header { gap: 8px; }
     sheet.querySelector(".editBody").prepend(list);
     let apps = [];
     try {
-      const payload = await (await fetch("/api/apps-on-tv", { cache: "no-store" })).json();
+      const payload = await (await fetch("/api/apps-on-tv" + (selectedAppsHost() ? "?host=" + encodeURIComponent(selectedAppsHost()) : ""), { cache: "no-store" })).json();
       apps = Array.isArray(payload.apps) ? payload.apps : [];
-      if (!apps.length && payload.error) list.textContent = payload.error;
+      if (!apps.length) list.textContent = payload.message || payload.error || "\u0627\u0644\u062A\u0644\u0641\u0632\u064A\u0648\u0646 \u0644\u0645 \u064A\u0631\u062C\u0639 \u062A\u0637\u0628\u064A\u0642\u0627\u062A\u061B \u0627\u0642\u062A\u0631\u0646\u0647 \u062B\u0645 \u0627\u0636\u063A\u0637 \u062A\u062D\u062F\u064A\u062B \u0627\u0644\u062A\u0637\u0628\u064A\u0642\u0627\u062A.";
     } catch {
       list.textContent = "\u062A\u0639\u0630\u0651\u0631 \u0627\u0644\u0648\u0635\u0648\u0644 \u0625\u0644\u0649 \u0627\u0644\u062A\u0644\u0641\u0632\u064A\u0648\u0646";
     }

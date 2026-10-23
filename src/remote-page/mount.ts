@@ -1,11 +1,13 @@
 import { Capacitor, CapacitorHttp, registerPlugin } from '@capacitor/core';
-import source from './source.html?raw';
+import bundledSource from './source.html?raw';
+import {latestRemotePage} from './updates.ts';
 import { createPageBridge, type PageHost, type Utility } from './bridge.ts';
 
 declare global {interface Window {flixRemotePageRequest:(route:string,init?:{method?:string;body?:string})=>Promise<Response>;flixRemoteSpeech:()=>Promise<{text:string}>}}
 const cloudHosts=new Set(['flix-s-neon.vercel.app','flix-iptv-snowy.vercel.app','flix-admin-tan.vercel.app']);
 /** The bundled original page runs unchanged; only transport and account/install entry points change. */
-export function mountOriginalRemote(host:PageHost){
+export async function mountOriginalRemote(host:PageHost){
+ let source=await latestRemotePage(bundledSource),idleAfter=0,updating=false;
  const frame=document.createElement('iframe');frame.id='original-remote';frame.title='صفحة ريموت FLIX الأصلية';
  frame.setAttribute('sandbox','allow-scripts allow-same-origin allow-forms allow-modals');
  const request=createPageBridge(host),browserFetch=window.fetch.bind(window);
@@ -23,17 +25,23 @@ export function mountOriginalRemote(host:PageHost){
  };
  window.flixRemoteSpeech=()=>registerPlugin<{recognizeSpeech():Promise<{text:string}>}>('HomeDiscovery').recognizeSpeech();
  const speechShim=Capacitor.isNativePlatform()?`window.SpeechRecognition=class{start(){parent.flixRemoteSpeech().then(r=>{const row=[{transcript:r.text}];row.isFinal=true;this.onresult?.({resultIndex:0,results:[row]});}).catch(()=>this.onerror?.({error:'not-allowed'})).finally(()=>this.onend?.());}};`:'';
- const shim=`<script>window.fetch=(route,init)=>parent.flixRemotePageRequest(String(route),init);${speechShim}</script>`;
- const additions=`<style>.phone-tools{display:flex;gap:6px;padding:6px;flex-wrap:wrap}.phone-tools button{flex:1;font-size:12px;min-height:38px}.installBody .empty button{min-height:44px}</style><script>
+ const shim=`<script>window.flixNativePage=true;window.fetch=(route,init)=>parent.flixRemotePageRequest(String(route),init);${speechShim}</script>`;
+ const additions=`<style>
+ .remote-actions{display:flex;align-items:center;gap:6px}.remote-actions button{font:inherit;padding:6px 8px;min-height:34px;white-space:nowrap;flex:1}.remote-actions button:first-child{flex:1.7}.installer summary{padding:4px 6px}.phone-notice{position:fixed;inset:auto 8px 8px;background:#18382b;color:#fff;padding:12px;border-radius:12px;z-index:9999;font-size:13px;pointer-events:none}.phone-notice[hidden]{display:none}#nativePair{width:100%;margin-top:8px}
+ </style><script>
  const phonePanel=(panel,host)=>fetch('/api/native-panel',{method:'POST',body:JSON.stringify({panel,host:host||window.flixRemote?.host()||''})});
- const bar=document.createElement('div');bar.className='phone-tools';
- for(const [panel,label] of [['devices','الشاشات والاقتران'],['library','تطبيقاتي وإرسال الحزم'],['support','حساب FLIX والدعم']]){const b=document.createElement('button');b.textContent=label;b.onclick=()=>phonePanel(panel);bar.append(b);}
- document.querySelector('.remote header')?.after(bar);
  const oldLink=document.querySelector('a[href="/home-remote"]');if(oldLink)oldLink.remove();
- const install=document.querySelector('.installer');install?.addEventListener('toggle',()=>{if(install.open)phonePanel('library');});
+ const install=document.querySelector('.installer'),summary=install?.querySelector('summary');
+ if(summary){summary.textContent='';summary.classList.add('remote-actions');for(const [panel,label] of [['library','تثبيت التطبيقات'],['support','حساب FLIX'],['problem','فيه مشكلة']]){const b=document.createElement('button');b.type='button';b.textContent=label;if(panel==='problem')b.title='مشاركة تشخيص هذا الجوال والشاشات فقط؛ يمكنك إيقاف المشاركة من حساب FLIX';b.onclick=e=>{e.preventDefault();e.stopPropagation();phonePanel(panel)};summary.append(b);}}
+ install?.addEventListener('toggle',()=>{if(install.open){install.open=false;phonePanel('library');}});
+ const pair=document.createElement('button');pair.id='nativePair';pair.textContent='اقتران بالتلفزيون';pair.onclick=()=>phonePanel('pair');document.getElementById('closeSheet')?.before(pair);
  document.getElementById('useIp').addEventListener('click',()=>phonePanel('manual',document.getElementById('ipInput').value.trim()));
+ const notice=document.createElement('div');notice.id='phoneNotice';notice.className='phone-notice';notice.hidden=true;notice.setAttribute('role','status');document.body.append(notice);
  </script>`;
- frame.srcdoc=source.replace('<head>','<head>'+shim).replace('</body>',additions+'</body>');
+ const setSource=(html:string)=>{frame.srcdoc=html.replace('<head>','<head>'+shim).replace('</body>',additions+'</body>');};
+ const canReload=()=>!document.hidden&&Date.now()>=idleAfter&&!document.body.classList.contains('native-sheet-open')&&!document.querySelector('dialog[open],input:focus,textarea:focus,select:focus')&&!frame.contentDocument?.body.classList.contains('editing')&&!frame.contentDocument?.querySelector('.sheet:not([hidden]),.psheet:not([hidden]),input:focus,textarea:focus,select:focus');
+ frame.addEventListener('load',()=>{for(const event of ['pointerdown','pointerup','keydown','touchstart','touchend'])frame.contentDocument?.addEventListener(event,()=>{idleAfter=Date.now()+5000;},{passive:true});});
+ setSource(source);
  document.body.prepend(frame);document.body.classList.add('remote-original');
- return{show:(tvHost?:string)=>{if(tvHost)(frame.contentWindow as any)?.flixRemote?.useHost(tvHost);document.body.classList.add('remote-original');},open:(action:Utility)=>host.open(action)};
+ return{update:async()=>{if(updating||!canReload())return;updating=true;try{const next=await latestRemotePage(bundledSource);if(next!==source&&canReload()){source=next;setSource(next);}}finally{updating=false;}},notify:(message:string)=>{const notice=frame.contentDocument?.getElementById('phoneNotice');if(notice){notice.textContent=message;notice.hidden=false;setTimeout(()=>{notice.hidden=true;},7000);}},show:(tvHost?:string)=>{if(tvHost)(frame.contentWindow as any)?.flixRemote?.useHost(tvHost);document.body.classList.add('remote-original');},open:(action:Utility)=>host.open(action)};
 }

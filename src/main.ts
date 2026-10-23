@@ -6,6 +6,7 @@ import { mountOriginalRemote } from './remote-page/mount.ts';
 import './style.css';
 import * as support from './support.ts';
 import { VERSION, BUILD_ID } from './build-info.ts';
+import { fetchCatalog, downloadRelease, catalogState, type CatalogRelease } from './catalog.ts';
 type Television = Device & { capabilities: Capabilities };
 type Tab = 'remote' | 'apps' | 'settings' | 'library' | 'support';
 const root = document.querySelector<HTMLDivElement>('#app')!;
@@ -15,7 +16,11 @@ let appError = '', settingsError = '', busy = false, scanning = false, reconnect
 const details = new Map<string, { checkedAt: number; status: string; error: string; apps: TvApp[]; settings: Setting[]; activity?: TvActivity }>();
 let supportPolling = false, lastHeartbeat = 0, lastInspection = 0;
 let statusMessage = '', statusError = false;
-let originalRemote: ReturnType<typeof mountOriginalRemote> | undefined;
+let sheetOpen = false;
+let catalog:CatalogRelease[]=[],catalogError='',catalogCheckedAt=0;
+async function refreshCatalog(){if(!support.account){catalog=[];catalogError='ادخل بحساب FLIX لعرض مكتبة تطبيقاتكم.';return;}const session=support.account;try{const result=await fetchCatalog(session);if(support.account===session){catalog=result;catalogCheckedAt=Date.now();catalogError='';}}catch(error){catalogError=error instanceof Error?error.message:'تعذر تحديث المكتبة';}}
+function catalogPanel(d:Television){return `<h3>مكتبة FLIX المركزية</h3>${button('refresh-catalog','تحديث المكتبة','class="quiet"')}<p class="fine">${escape(catalogError|| (catalogCheckedAt?'آخر تحديث '+new Date(catalogCheckedAt).toLocaleTimeString('ar'):'تُحدّث عند فتح هذه النافذة.'))}</p>${catalog.filter(r=>r.platform===d.platform).map(r=>{const state=catalogState(r,packages);return `<article class="package"><div><strong>${escape(r.name)} ${escape(r.version)}</strong><small>${escape(state.label)} · ${(r.bytes/1048576).toFixed(1)} MB</small><p class="fine">${escape(r.notes)}</p></div>${state.package?'<span>✓</span>':`<button data-catalog="${escape(r.id)}">تنزيل النسخة</button>`}</article>`;}).join('')||'<p class="fine">لا نسخ منشورة لهذا النظام حتى الآن.</p>'}<p class="fine">التنزيل يحفظ الحزمة بعد فحص بصمتها؛ اختر «تثبيت» أدناه لمراجعة نقلها للتلفزيون. لا يُثبّت تحديث تلقائيًا. ظهور تطبيق على الشاشة لا يثبت رقم نسخته ما لم يُعده النظام.</p>`;}
+let originalRemote: Awaited<ReturnType<typeof mountOriginalRemote>> | undefined;
 const icons = new Map<string, string>();
 const escape = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 const television = () => devices.find(d => d.id === selected);
@@ -24,20 +29,18 @@ const tvPath = (id = selected) => '/api/devices/' + encodeURIComponent(id);
 function snapshot() { return { directConnected: online, connectionMode: 'phone-direct', discovery: discoveryDiagnostics, deviceCount: devices.length, selectedDeviceId: selected, apps, settings, devices: devices.map(d => ({ ...d, ...details.get(d.id), appCount: details.get(d.id)?.apps.length || 0 })), packages, receipts }; }
 function supportPanel() {
   const grant = support.control && support.control.expiresAt > Date.now() ? support.control : undefined;
-  return `<section class="panel support-panel"><div class="section-heading"><h2>الدعم عن بُعد</h2>${button(support.account ? 'logout' : 'login', support.account ? 'خروج' : 'دخول FLIX', 'class="quiet"')}</div>
-  <p>${support.account ? `متصل بحساب <bdi>${escape(support.account.account.email)}</bdi>` : 'ادخل بنفس بريد وكلمة مرور FLIX لربط أجهزتك ومشاكلها بحسابك.'}</p>
-  <p class="fine">يرسل الجوال الشاشات المتاحة وآخر فحص والأخطاء والتطبيقات والإعدادات والحزم ونتائج التثبيت، والتطبيق أو المحتوى الجاري إذا كشفه التلفزيون. لا تُرسل كلمات المرور أو رموز الاقتران. أبقِ التطبيق مفتوحًا وعلى Wi-Fi البيت أثناء الدعم.</p>
-  <p class="notice">${!online ? 'ثبّت التطبيق واسمح له بالشبكة المحلية.' : !devices.length ? 'ابحث عن الشاشات أو أضف عنوان التلفزيون.' : 'الجوال هو نقطة الاتصال بالتلفزيونات. نجاح تهيئة الشبكة لا يعني أن كل شاشة متصلة؛ راجع آخر فحص أدناه.'}</p>
-  ${devices.map(d => { const info = details.get(d.id); return `<article class="support-action"><strong>${escape(d.name)}</strong><p>${escape(!d.paired ? 'يحتاج اقترانًا' : !info ? 'محفوظ · لم يُفحص بعد' : info.status === 'reachable' ? 'استجاب للفحص' : info.status === 'partial' ? 'استجابة جزئية' : 'تعذر الفحص')} ${info ? '· ' + escape(new Date(info.checkedAt).toLocaleTimeString('ar')) : ''}</p><p class="fine">${escape(info?.error)}</p><p>النشاط: ${escape(info?.activity?.available ? [info.activity.label || info.activity.appId, info.activity.title, info.activity.state].filter(Boolean).join(' · ') : info?.activity?.reason || 'غير معروف حتى الفحص')}</p></article>`; }).join('')}
-  ${support.account ? `<form data-form="support"><label>وش المشكلة؟<textarea name="problem" rows="3" maxlength="1200" required placeholder="مثال: شاشة الصالة لا تقبل التحكم"></textarea></label><label class="consent"><input type="checkbox" name="consent" required> أوافق على مشاركة التشخيص والنشاط المتاح أثناء استخدام التطبيق</label><button class="primary">${support.sharing ? 'تحديث بلاغي' : 'إرسال التشخيص وفتح الدعم'}</button></form>` : button('login', 'تسجيل الدخول بحساب FLIX', 'class="primary"')}
-  ${support.sharing ? `<div class="notice">${grant ? `التحكم متاح للدعم على ${escape(devices.find(d => d.id === grant.deviceId)?.name)} حتى ${escape(new Date(grant.expiresAt).toLocaleTimeString('ar'))}. ${button('revoke-control','إيقاف التحكم فورًا','class="quiet"')}` : `التحكم يحتاج موافقتك لكل إجراء. ${television()?.paired ? button('grant-control','السماح بالتحكم 15 دقيقة في الشاشة المختارة','class="primary full"') : ''}`}</div>${button('poll-support','تحديث اتصال الدعم','class="quiet full"')}${button('stop-support','إيقاف مشاركة التشخيص والتحكم','class="text-button full"')}` : ''}
-  <p class="fine" role="status">${escape(support.supportMessage)}</p>${support.reportId ? `<p class="fine">رقم البلاغ <bdi>${escape(support.reportId)}</bdi></p>` : ''}
-  ${support.actions.map(a => `<article class="support-action"><strong>إجراء من دعم FLIX</strong><p>${escape(a.message)}</p><p>${escape(a.type)} · ${escape(a.command || a.appId || a.settingId || '')} · ${escape(devices.find(d => d.id === a.deviceId)?.name || 'البيت')}</p><button data-support="${escape(a.id)}" class="primary">مراجعة وتنفيذ</button><button data-dismiss="${escape(a.id)}" class="quiet">رفض</button></article>`).join('')}
-  ${button('export-support','حفظ ملف التشخيص','class="quiet full"')}<h3>رسائل الدعم</h3><div class="assistant-chat">${support.messages.map(m => `<article class="support-action"><strong>${m.role === 'user' ? 'أنت' : 'دعم FLIX'}</strong><p>${escape(m.text)}</p></article>`).join('')}</div>
-  ${support.account ? `<form data-form="support-message"><label>رسالتك للدعم<textarea name="message" maxlength="1200" rows="3" required></textarea></label><label class="consent"><input type="checkbox" name="consent" required> أوافق على إرسال الرسالة وتحديث التشخيص</label><button class="primary">إرسال للدعم</button></form>` : ''}
-  <p class="fine">يقرأ مسؤول الدعم أو Codex البلاغ من لوحة FLIX أو جسر الدعم عند العمل عليه. هذه المحادثة ليست اتصالًا دائمًا؛ لا تحتاج هذه القناة مفتاح OpenAI. التثبيت والاقتران وإطفاء الشاشة تبقى بموافقة مستقلة. إغلاق التطبيق أو نقله للخلفية يلغي جلسة التحكم.</p></section>`;
+  return `<section class="panel support-panel"><div class="section-heading"><h2>حساب FLIX</h2>${button(support.account ? 'logout' : 'login', support.account ? 'خروج' : 'دخول FLIX', 'class="quiet"')}</div>
+  <p>${support.account ? `<bdi>${escape(support.account.account.email)}</bdi>` : 'ادخل بحساب FLIX نفسه ليظهر هذا الجوال في إدارة الريموت.'}</p>
+  <p class="fine">يظهر للمسؤول الحساب ونوع الجوال والإصدار وآخر اتصال. يمكنه إيقاف صلاحية الريموت وإعادتها. فحص الصلاحية يحتاج الإنترنت؛ أوامر التلفزيون تنتقل من الجوال مباشرة.</p>
+  ${support.accessGate.current()?.enabled === false ? `<p class="notice">${escape(support.accessGate.current()?.reason)}</p>` : ''}
+  <h3>فيه مشكلة؟</h3><p>ضغطة واحدة ترسل هوية هذا الجوال والشاشات والأخطاء والتطبيقات والإعدادات والنشاط المتاح. اشرح المشكلة في محادثتك مع المسؤول؛ لا تحتاج كتابة رسالة هنا.</p>
+  ${button(support.account ? 'report-problem' : 'login', support.account ? 'فيه مشكلة · مشاركة التشخيص' : 'تسجيل الدخول بحساب FLIX', 'class="primary full"')}
+  ${support.sharing ? `<p class="notice">التشخيص متصل أثناء بقاء التطبيق مفتوحًا. ${grant ? 'التحكم مسموح على الشاشة المختارة لمدة محدودة.' : 'إرسال التشخيص لا يمنح إذن تغيير التلفزيون.'}</p>${grant ? button('revoke-control','إيقاف التحكم فورًا','class="quiet full"') : television()?.paired ? button('grant-control','السماح بإصلاح الشاشة 15 دقيقة','class="quiet full"') : ''}${button('poll-support','تحديث التشخيص','class="text-button full"')}${button('stop-support','إيقاف مشاركة التشخيص','class="text-button full"')}` : ''}
+  <p class="fine" role="status">${escape(support.supportMessage)}</p>
+  ${support.actions.map(a => `<article class="support-action"><p>${escape(a.message)}</p><button data-support="${escape(a.id)}" class="primary">مراجعة الإجراء</button><button data-dismiss="${escape(a.id)}" class="quiet">رفض</button></article>`).join('')}
+  <p class="fine">إغلاق التطبيق أو نقله للخلفية ينهي إذن التحكم. التثبيت والاقتران وإطفاء الشاشة تحتاج موافقة مستقلة.</p></section>`;
 }
-function showLogin() { dialog('دخول حساب FLIX', `<form data-form="login"><label>خدمة حساب FLIX<input name="service" type="url" dir="ltr" value="${escape(support.account?.url || import.meta.env.VITE_FLIX_ACCOUNT_URL || 'https://flix-admin-tan.vercel.app')}" required></label><label>البريد الإلكتروني<input type="email" name="email" dir="ltr" autocomplete="username" required></label><label>كلمة المرور<input name="password" type="password" autocomplete="current-password" required></label><button class="primary">دخول بنفس حساب FLIX</button><p class="fine">يستخدم نفس نظام الحسابات الحالي في FLIX.</p></form>`); }
+function showLogin() { dialog('دخول حساب FLIX', `<form data-form="login"><details><summary>إعدادات اتصال الحساب</summary><label>خدمة حساب FLIX<input name="service" type="url" dir="ltr" value="${escape(support.account?.url || import.meta.env.VITE_FLIX_ACCOUNT_URL || 'https://flix-admin-tan.vercel.app')}" required></label></details><label>البريد الإلكتروني<input type="email" name="email" dir="ltr" autocomplete="username" required></label><label>كلمة المرور<input name="password" type="password" autocomplete="current-password" required></label><button class="primary">دخول بنفس حساب FLIX</button><p class="fine">يستخدم نفس نظام الحسابات الحالي في FLIX.</p></form>`); }
 function reviewSupport(id: string) {
   const a = support.actions.find(a => a.id === id); if (!a) return;
   const d = devices.find(d => d.id === a.deviceId);
@@ -46,10 +49,16 @@ function reviewSupport(id: string) {
 }
 const api = async <T>(route: string, method = 'GET', data?: unknown, timeout?: number): Promise<T> => {
   const stage = route.split('?')[0];
+  if (!(stage === '/api/devices' && method === 'GET') && stage !== '/api/packages' && stage !== '/api/receipts') {
+    try { await support.accessGate.assertAllowed(); } catch (error) {
+      if (!support.account && (method !== 'GET' || stage === '/api/scan') && !document.querySelector('dialog[open]')) showLogin();
+      throw error;
+    }
+  }
   try { if (!online) throw new Error('افتح التطبيق المثبت واسمح له بالشبكة المحلية.'); const reply = await directApi<T>(route, method, data); if (!route.endsWith('/icon')) support.record(stage, 'ok', method, selected); return reply; }
   catch (error) { support.record(stage, 'failed', error instanceof Error ? error.message : 'network error', selected); throw error; }
 };
-function status(message: string, error = false) { statusMessage=message;statusError=error;const toast = document.querySelector<HTMLElement>('#status'); if(toast){toast.textContent = message; toast.dataset.error = String(error);} }
+function status(message: string, error = false) { statusMessage=message;statusError=error;originalRemote?.notify(message);const toast = document.querySelector<HTMLElement>('#status'); if(toast){toast.textContent = message; toast.dataset.error = String(error);} }
 function disable(disabled: boolean) {
   const d = television();
   root.querySelectorAll<HTMLButtonElement>('[data-command], [data-launch], [data-install]').forEach(b => {
@@ -58,7 +67,14 @@ function disable(disabled: boolean) {
   });
 }
 function render() {
+  if (document.querySelector('dialog[open]')) return;
   const d = television();
+  if (originalRemote) {
+    document.body.classList.toggle('native-sheet-open', sheetOpen);
+    const title = tab === 'support' ? 'حساب FLIX' : tab === 'library' ? 'تثبيت التطبيقات' : tab === 'settings' ? 'إعدادات الشاشة' : tab === 'apps' ? 'تطبيقات الشاشة' : 'شاشات البيت';
+    root.innerHTML = `<section class="native-sheet" role="dialog" aria-label="${title}"><header><h2>${title}</h2>${button('original-remote','×','class="quiet" aria-label="إغلاق النافذة"')}</header><main><div id="status" role="status" class="status" data-error="${statusError}">${escape(statusMessage)}</div>${tab === 'support' ? supportPanel() : tab === 'remote' ? `<div class="devices">${devices.map(x=>button('select-tv',escape(x.name)+(x.paired?' · مقترن':' · اقتران'),`data-device="${escape(x.id)}" class="device"`)).join('')}</div>${button('scan','بحث','class="primary"')} ${button('manual','إضافة بالعنوان','class="quiet"')}${d?button('pair',d.paired?'إعادة الاقتران':'اقتران بالتلفزيون','class="primary full"'):''}` : d ? content(d) : `<p>اختر التلفزيون من زر الشاشة في الريموت أولًا.</p>${button('manual','إضافة تلفزيون','class="primary"')}`}</main><footer>ريموت FLIX ${escape(VERSION)}</footer></section><dialog id="dialog"></dialog>`;
+    disable(busy || !d?.capabilities.control.available); return;
+  }
   root.innerHTML = `${originalRemote?button('original-remote','↩ العودة لصفحة الريموت','class="primary original-back"'):''}<header><a class="wordmark" href="#" aria-label="ريموت البيت"><span class="logo" aria-hidden="true">⌁</span><span>ريموت <b>FLIX</b></span></a>${button('connection', `<span class="dot ${online ? 'connected' : ''}"></span>${online ? 'اتصال مباشر' : 'نسخة الهاتف'}`, 'class="connection"')}<button class="quiet" data-action="support">الحساب والمساعدة</button></header>
     <main><div class="eyebrow">كل شاشات البيت · في مكان واحد</div><div class="title-row"><h1>${d ? escape(d.name) : 'اختر تلفزيونك'}</h1>${button('scan', scanning ? 'يبحث…' : '↻ بحث', `class="quiet" ${!online || scanning ? 'disabled' : ''}`)}</div>
     <p class="subtitle">${d ? escape(platformNames[d.platform]) : 'اتصل بواي فاي البيت؛ هاتفك يتصل بالتلفزيون مباشرة.'}</p>
@@ -75,18 +91,18 @@ function content(d: Television) {
   if (tab === 'apps') return `<section class="panel"><div class="section-heading"><h2>تطبيقات التلفزيون <span class="count">${apps.length}</span></h2>${button('refresh', '↻ تحديث', 'class="quiet"')}</div>${appError ? `<p class="notice" role="alert">${escape(appError)}</p>` : ''}${apps.length ? `<div class="app-grid">${apps.map(a => `<button class="tv-app" data-launch="${escape(a.id)}"><span class="app-icon" data-icon="${escape(a.id)}">${icons.has(d.id + ':' + a.id) ? `<img src="${icons.get(d.id + ':' + a.id)}" alt="">` : escape(a.label.slice(0, 2).toUpperCase())}</span><span>${escape(a.label)}</span></button>`).join('')}</div>` : `<div class="empty">ستظهر هنا التطبيقات التي يعيدها التلفزيون بعد الاقتران والتحديث.</div>`}<p class="fine">الأيقونات الأصلية تظهر عندما يتيحها الجهاز. يظهر رمز بالاسم عندما تكون الأيقونة محلية أو غير متاحة.</p></section>`;
   if (tab === 'settings') return `<section class="panel"><div class="section-heading"><h2>إعدادات هذه الشاشة</h2>${button('refresh', '↻ تحديث', 'class="quiet"')}</div>${settingsError ? `<p class="notice">${escape(settingsError)}</p>` : ''}${settings.map(s => s.kind === 'action' ? button('setting', escape(s.label) + ' ↗', `class="setting-action" data-setting="${escape(s.id)}"`) : `<form data-form="setting" class="setting"><input type="hidden" name="id" value="${escape(s.id)}"><label for="setting-${escape(s.id)}">${escape(s.label)}</label>${s.kind === 'number' ? `<input id="setting-${escape(s.id)}" name="value" type="number" min="${s.min}" max="${s.max}" value="${s.value}">` : s.kind === 'boolean' ? `<select id="setting-${escape(s.id)}" name="value"><option value="true" ${s.value ? 'selected' : ''}>مفعل</option><option value="false" ${!s.value ? 'selected' : ''}>غير مفعل</option></select>` : `<select id="setting-${escape(s.id)}" name="value">${s.options?.map(o => `<option value="${escape(o.id)}">${escape(o.label)}</option>`).join('')}</select>`}<button class="quiet">تطبيق</button></form>`).join('')}<p class="fine">${escape(d.capabilities.note)}</p>${button('developer', 'إعداد المطوّر والتثبيت', 'class="primary"')}</section>`;
   const compatible = packages.filter(p => p.platform === d.platform);
-  return `<section class="panel"><div class="section-heading"><div><h2>تطبيقاتي على التلفزيون</h2><p class="fine">أضف تطبيقك مرة، واختر الشاشة المتوافقة لتثبيته.</p></div>${button('upload', '+ إضافة', 'class="quiet"')}</div>${!d.capabilities.install.available ? `<p class="notice">${escape(d.capabilities.install.reason)} ${button('developer', 'طريقة التجهيز', 'class="text-button"')}</p>` : ''}${compatible.map(p => `<article class="package"><span class="package-icon">▧</span><div><strong>${escape(p.name)}</strong><small>${escape(p.version || 'نسخة غير محددة')} · ${(p.bytes / 1048576).toFixed(1)} MB</small></div><button data-install="${escape(p.id)}" ${!d.capabilities.install.available ? 'disabled' : ''}>تثبيت</button></article>`).join('') || '<div class="empty">لا توجد حزم لهذا النظام. أضف APK أو IPK أو WGT المناسب.</div>'}<p class="fine">${packages.length - compatible.length ? `${packages.length - compatible.length} حزم لأنظمة أخرى محفوظة على الهاتف.` : 'حزمك محفوظة على الهاتف، وتُنقل مباشرة للتلفزيون.'}</p><h3>سجل التثبيت</h3>${receipts.filter(r => r.deviceId === d.id).slice(0, 5).map(r => `<p class="receipt ${r.status}">${r.status === 'installed' ? '✓' : r.status === 'failed' ? '!' : '…'} ${escape(packages.find(p => p.id === r.packageId)?.name || 'تطبيق')}<small>${escape(r.message)}</small></p>`).join('') || '<p class="fine">لا عمليات تثبيت سابقة على هذه الشاشة.</p>'}</section>`;
+  return `<section class="panel"><div class="section-heading"><div><h2>تطبيقاتي على التلفزيون</h2><p class="fine">أضف تطبيقك مرة، واختر الشاشة المتوافقة لتثبيته.</p></div>${button('upload', '+ إضافة', 'class="quiet"')}</div>${!d.capabilities.install.available ? `<p class="notice">${escape(d.capabilities.install.reason)} ${button('developer', 'طريقة التجهيز', 'class="text-button"')}</p>` : ''}${catalogPanel(d)}${compatible.map(p => `<article class="package"><span class="package-icon">▧</span><div><strong>${escape(p.name)}</strong><small>${escape(p.version || 'نسخة غير محددة')} · ${(p.bytes / 1048576).toFixed(1)} MB</small></div><button data-install="${escape(p.id)}" ${!d.capabilities.install.available ? 'disabled' : ''}>تثبيت</button></article>`).join('') || '<div class="empty">لا توجد حزم لهذا النظام. أضف APK أو IPK أو WGT المناسب.</div>'}<p class="fine">${packages.length - compatible.length ? `${packages.length - compatible.length} حزم لأنظمة أخرى محفوظة على الهاتف.` : 'حزمك محفوظة على الهاتف، وتُنقل مباشرة للتلفزيون.'}</p><h3>سجل التثبيت</h3>${receipts.filter(r => r.deviceId === d.id).slice(0, 5).map(r => `<p class="receipt ${r.status}">${r.status === 'installed' ? '✓' : r.status === 'failed' ? '!' : '…'} ${escape(packages.find(p => p.id === r.packageId)?.name || 'تطبيق')}<small>${escape(r.message)}</small></p>`).join('') || '<p class="fine">لا عمليات تثبيت سابقة على هذه الشاشة.</p>'}</section>`;
 }
 function dialog(title: string, body: string) {
-  const el = document.querySelector<HTMLDialogElement>('#dialog')!;
-  el.innerHTML = `<div class="dialog-head"><h2>${title}</h2>${button('close', '×', 'aria-label="إغلاق" class="quiet"')}</div>${body}<p id="dialog-status" role="status" aria-live="polite"></p>`; el.showModal();
+  const el = document.querySelector<HTMLDialogElement>('#dialog')!; el.onclose=()=>document.body.classList.remove('native-dialog-open');
+  el.innerHTML = `<div class="dialog-head"><h2>${title}</h2>${button('close', '×', 'aria-label="إغلاق" class="quiet"')}</div>${body}<p id="dialog-status" role="status" aria-live="polite"></p>`; document.body.classList.add('native-dialog-open'); el.showModal();
 }
 function showInstall(d: Television, p: PackageEntry) {
   dialog('مراجعة التثبيت', `<p>تثبيت <strong>${escape(p.name)} ${escape(p.version)}</strong> على <strong>${escape(d.name)}</strong>؟</p><p class="fine">${escape(platformNames[p.platform])} · <bdi>${escape(d.host)}</bdi></p><details><summary>بصمة الحزمة SHA-256</summary><code>${escape(p.sha256)}</code></details><p>قد يطلب التلفزيون موافقة إضافية. أبقِ التطبيق مفتوحًا والهاتف متصلًا بنفس Wi-Fi أثناء النقل المباشر.</p><form data-form="install"><input type="hidden" name="deviceId" value="${escape(d.id)}"><input type="hidden" name="packageId" value="${escape(p.id)}"><button class="primary">تأكيد التثبيت على هذه الشاشة</button></form>`);
 }
-function closeDialog() { document.querySelector<HTMLDialogElement>('#dialog')?.close(); }
+function closeDialog() { document.querySelector<HTMLDialogElement>('#dialog')?.close(); document.body.classList.remove('native-dialog-open'); }
 function showConnection() {
-  dialog('الاتصال المباشر', `<p>يتصل iPhone أو Android بالتلفزيون مباشرة على Wi-Fi؛ لا يحتاج كمبيوترًا أو وسيطًا في البيت.</p><ol class="steps"><li>ثبّت تطبيق ريموت البيت على الهاتف.</li><li>صل الهاتف والتلفزيون بالشبكة نفسها واسمح بإذن الشبكة المحلية.</li><li>ابحث أو أضف عنوان التلفزيون ثم وافق على الاقتران على الشاشة.</li></ol>${Capacitor.isNativePlatform() ? button('scan', 'بحث مباشر عن التلفزيونات', 'class="primary full"') + button('forget', 'مسح مكتبة ومفاتيح التلفزيونات من الهاتف', 'class="text-button full"') : '<p>تُوزّع نسخ الهاتف من صفحة FLIX بعد إعداد النشر. متصفح الويب يعرض الواجهة ولا يملك اتصال التلفزيون الأصلي.</p>'}<p class="fine">التحكم محلي. حساب FLIX والدعم فقط يحتاجان الإنترنت. على iPhone يجمع البحث Bonjour ووصف التلفزيون عبر الشبكة المحلية؛ ويمكن إضافة عنوان التلفزيون يدويًا إذا حجبه الراوتر.</p>`);
+  dialog('الاتصال المباشر', `<p>يتصل iPhone أو Android بالتلفزيون مباشرة على Wi-Fi؛ لا يحتاج كمبيوترًا أو وسيطًا في البيت.</p><ol class="steps"><li>ثبّت تطبيق ريموت البيت على الهاتف.</li><li>صل الهاتف والتلفزيون بالشبكة نفسها واسمح بإذن الشبكة المحلية.</li><li>ابحث أو أضف عنوان التلفزيون ثم وافق على الاقتران على الشاشة.</li></ol>${Capacitor.isNativePlatform() ? button('scan', 'بحث مباشر عن التلفزيونات', 'class="primary full"') + button('forget', 'مسح مكتبة ومفاتيح التلفزيونات من الهاتف', 'class="text-button full"') : '<p>تُوزّع نسخ الهاتف من صفحة FLIX بعد إعداد النشر. متصفح الويب يعرض الواجهة ولا يملك اتصال التلفزيون الأصلي.</p>'}<p class="fine">التحكم محلي؛ التحقق الدوري من صلاحية الحساب والتشخيص يحتاجان الإنترنت. على iPhone يجمع البحث Bonjour ووصف التلفزيون عبر الشبكة المحلية؛ ويمكن إضافة عنوان التلفزيون يدويًا إذا حجبه الراوتر.</p>`);
 }
 function showPair() {
  const d=television();if(!d)return;
@@ -158,11 +174,11 @@ root.addEventListener('click', event => {
   const target = (event.target as Element).closest<HTMLElement>('button, a'); if (!target) return;
   if (target instanceof HTMLButtonElement && target.disabled) return;
   const action = target.dataset.action;
-  if (action === 'original-remote') { closeDialog();originalRemote?.show(television()?.host);return; }
+  if (action === 'original-remote') { closeDialog(); sheetOpen=false; render(); originalRemote?.show(television()?.host);return; }
   if (action === 'close') { closeDialog(); return; }
-  if (action === 'support') { tab = 'support'; render(); return; }
+  if (action === 'support') { tab = 'support'; sheetOpen=true; render(); return; }
   if (action === 'login') { showLogin(); return; }
-  if (action === 'grant-control') { const d = television(); if (!d?.paired) return; dialog('السماح بالتحكم عن بُعد', `<p>السماح للدعم لمدة 15 دقيقة بالتحكم في <strong>${escape(d.name)}</strong>، وفتح تطبيقاتها وتغيير إعداداتها المتاحة. قد تتغير الصورة والصوت أثناء الجلسة. أبقِ الجوال مفتوحًا على نفس Wi-Fi.</p><form data-form="grant-control"><input type="hidden" name="deviceId" value="${escape(d.id)}"><label class="consent"><input type="checkbox" name="consent" required> أوافق على هذه الجلسة ويمكنني إيقافها فورًا</label><button class="primary">بدء جلسة التحكم</button></form>`); return; }
+  if (action === 'grant-control') { const d = television(); if (!d?.paired) return; dialog('السماح بالتحكم عن بُعد', `<p>السماح للدعم لمدة 15 دقيقة بالتحكم في <strong>${escape(d.name)}</strong>، وفتح تطبيقاتها وتغيير إعداداتها المتاحة. قد تتغير الصورة والصوت أثناء الجلسة. أبقِ الجوال مفتوحًا على نفس Wi-Fi.</p><form data-form="grant-control"><input type="hidden" name="deviceId" value="${escape(d.id)}"><input type="hidden" name="consent" value="on"><p>بالضغط على بدء الجلسة توافق على هذا التحكم؛ يمكنك إيقافه فورًا.</p><button class="primary">بدء جلسة التحكم</button></form>`); return; }
   if (action === 'revoke-control' || action === 'stop-support') { support.revokeControl(); if (action === 'stop-support') { void support.stopSharing().then(render); } else { void support.syncSupport(snapshot()).catch(() => undefined); render(); } return; }
   if (target.dataset.support) { void run(async () => reviewSupport(target.dataset.support!)); return; }
   if (target.dataset.dismiss) { void support.resolveAction(target.dataset.dismiss, 'declined').then(render); return; }
@@ -172,14 +188,17 @@ root.addEventListener('click', event => {
   if (action === 'guide') { closeDialog(); guide(); return; }
   if (action === 'manual') { dialog('إضافة تلفزيون', `<form data-form="manual"><label>اسم الشاشة<input name="name" placeholder="تلفزيون الصالة"></label><label>عنوان التلفزيون<input name="host" dir="ltr" placeholder="192.168.1.30" required></label><label>النظام<select name="platform">${Object.entries(platformNames).map(([v, name]) => `<option value="${v}">${name}</option>`).join('')}</select></label><button class="primary">إضافة التلفزيون</button></form>`); return; }
   if (action === 'upload') { dialog('إضافة تطبيقك', `<form data-form="upload"><label>اسم التطبيق<input name="name" required></label><label>معرف التطبيق<input name="appId" dir="ltr" placeholder="com.example.tv" required></label><label>الإصدار<input name="version" dir="ltr" placeholder="1.0.0"></label><label>نظام الحزمة<select name="platform"><option value="android">Android · APK</option><option value="webos">LG · IPK</option><option value="tizen">Samsung · WGT</option></select></label><label>ملف التطبيق (حتى 64 MB)<input name="file" type="file" accept=".apk,.ipk,.wgt" required></label><p class="fine">لكل نظام حزمته. أضف نسخ التطبيق الثلاث بالمعرف والاسم المناسبين. تتطلب WGT شهادة صالحة للتلفزيون.</p><button class="primary">حفظ في تطبيقاتي</button></form>`); return; }
-  if (target.dataset.tab) { tab = target.dataset.tab as Tab; render(); return; }
+  if (target.dataset.tab) { tab = target.dataset.tab as Tab; render(); if(tab==='library')void refreshCatalog().then(render); return; }
   if (target.dataset.device) { if (busy) return; selected = target.dataset.device; apps = []; settings = []; appError = ''; settingsError = ''; render(); void run(loadDetails); return; }
   if (target.dataset.install) {
     const p = packages.find(p => p.id === target.dataset.install), d = television(); if (!p || !d) return;
     showInstall(d, p); return;
   }
   void run(async () => {
-    if (action === 'logout') { await support.logout(); render(); return; }
+    if(target.dataset.catalog){const release=catalog.find(r=>r.id===target.dataset.catalog);if(!release)return;await support.accessGate.assertAllowed();status('جارٍ تنزيل النسخة والتحقق من بصمتها…');const data=await downloadRelease(release);await api('/api/packages','POST',{...release,data});packages=(await api<{packages:PackageEntry[]}>('/api/packages')).packages;render();status('حُفظت النسخة المتحقق منها؛ راجع التثبيت على الشاشة المختارة.');return;}
+    if(action==='refresh-catalog'){await refreshCatalog();render();return;}
+    if (action === 'report-problem') { if (!support.account) { showLogin(); return; } await support.syncSupport(snapshot(), {problem:'ضغط صاحب الجوال: فيه مشكلة'}); status('وصل التشخيص؛ اشرح المشكلة في محادثتك مع المسؤول.'); if(sheetOpen)render(); return; }
+    if (action === 'logout') { await support.logout(); catalog=[];catalogCheckedAt=0; render(); return; }
     if (action === 'poll-support') { await support.syncSupport(snapshot()); render(); return; }
     if (action === 'export-support') { await support.exportDiagnostics(snapshot()); return; }
     if (action === 'scan') { closeDialog(); await scan(); }
@@ -195,15 +214,15 @@ root.addEventListener('submit', event => {
   const form = event.target as HTMLFormElement, data = new FormData(form); const values = Object.fromEntries(data); const name = form.dataset.form;
   const submit = form.querySelector<HTMLButtonElement>('button'); if (submit) submit.disabled = true;
   void run(async () => {
-    if (name === 'login') { await support.login(String(values.service), String(values.email), String(values.password)); form.reset(); closeDialog(); tab = 'support'; render(); return; }
-    if (name === 'support-message') { if (!values.consent) throw new Error('يلزم موافقتك على إرسال التشخيص.'); await support.sendMessage(snapshot(), String(values.message)); render(); return; }
+    if (name === 'login') { await support.login(String(values.service), String(values.email), String(values.password)); form.reset(); closeDialog(); tab = 'support'; sheetOpen=true; render(); return; }
+    
     if (name === 'grant-control') {
       if (!values.consent || !devices.some(d => d.id === values.deviceId && d.paired)) throw new Error('راجع موافقة الشاشة.');
       support.grantControl(String(values.deviceId));
       try { await support.syncSupport(snapshot()); } catch (error) { support.revokeControl(); throw error; }
       closeDialog(); render(); return;
     }
-    if (name === 'support') { if (!values.consent) throw new Error('يلزم موافقتك على إرسال التشخيص.'); await support.syncSupport(snapshot(), { problem: String(values.problem) }); render(); return; }
+
     if (name === 'support-action') {
       const a = support.actions.find(a => a.id === values.id); if (!a) throw new Error('انتهى الإجراء.');
       closeDialog(); await executeSupportAction(a, false); return;
@@ -213,7 +232,7 @@ root.addEventListener('submit', event => {
       const id = selected; if (values.port) await api(tvPath(id), 'PATCH', { port: Number(values.port) });
       document.querySelector('#dialog-status')!.textContent = 'بانتظار التلفزيون… وافق على شاشة التلفزيون إذا ظهر طلب.';
       await api(tvPath(id) + '/pair', 'POST', { code: values.code ? String(values.code).replace(/[٠-٩۰-۹]/g,c=>String(c.charCodeAt(0)-(c>='۰'?1776:1632))) : undefined, pairPort: values.pairPort ? Number(values.pairPort) : undefined }, 150000);
-      closeDialog(); await refreshDevices(); await loadDetails(); status('التلفزيون مقترن.');
+      closeDialog(); await refreshDevices(); await loadDetails(); originalRemote?.show(television()?.host); status('التلفزيون مقترن.');
     } else if(name==='developer'){
       if(values.fingerprint&&values.trust!=='on')throw new Error('راجع البصمة ووافق عليها أولًا.');
       const result=await api<{needsTrust?:boolean;fingerprint?:string;message?:string}>(tvPath()+'/developer','POST',{passphrase:values.passphrase,port:values.port?Number(values.port):undefined,fingerprint:values.fingerprint},190000);
@@ -301,11 +320,12 @@ await support.initSupport();
 render();
 await reconnect();
 if (!new URLSearchParams(location.search).has('utility')) {
-  originalRemote=mountOriginalRemote({api,selected:()=>selected,select:id=>{selected=id;},record:(stage,ok,message,id)=>support.record(stage,ok?'ok':'failed',message,id),open:(action,host)=>{
-    void run(async()=>{if(online)await refreshDevices();if(host){const d=devices.find(d=>d.host===host);if(d)selected=d.id;}
-    document.body.classList.remove('remote-original');tab=action==='support'?'support':action==='library'?'library':action==='settings'?'settings':'remote';await loadDetails();render();
+  originalRemote=await mountOriginalRemote({api,selected:()=>selected,select:id=>{selected=id;},record:(stage,ok,message,id)=>support.record(stage,ok?'ok':'failed',message,id),open:(action,host)=>{
+    void run(async()=>{if(action==='problem'){if(!support.account){showLogin();return;}await support.syncSupport(snapshot(),{problem:'ضغط صاحب الجوال: فيه مشكلة'});status('وصل تشخيص هذا الجوال. اشرح المشكلة في محادثتك مع المسؤول.');return;}if(online)await refreshDevices();if(host){const d=devices.find(d=>d.host===host);if(d)selected=d.id;}
+    sheetOpen=!['pair','manual'].includes(action);tab=action==='support'?'support':action==='library'?'library':action==='settings'?'settings':'remote';if(action!=='support')await loadDetails();if(action==='library')await refreshCatalog();render();
     if(action==='pair')showPair();else if(action==='manual'){root.querySelector<HTMLButtonElement>('[data-action="manual"]')?.click();const input=root.querySelector<HTMLInputElement>('input[name="host"]');if(input&&host)input.value=host;}});
   }});
+  render();
 }
 if (Capacitor.isNativePlatform()) {
   closeDialog(); if(!originalRemote)void run(scan);
@@ -315,3 +335,6 @@ window.addEventListener('online', () => { void reconnect(); });
 
 document.addEventListener('visibilitychange', () => { if (document.hidden) { support.revokeControl(); void support.stopSharing(); } });
 setInterval(() => { void serviceSupport(); }, 5000);
+
+setInterval(() => { if(support.account && !document.hidden) void support.accessGate.refresh().catch(()=>undefined); },30000);
+setInterval(()=>{if(originalRemote&&!document.hidden&&!busy&&!sheetOpen&&!support.sharing&&!document.querySelector('dialog[open]'))void originalRemote.update();},60000);

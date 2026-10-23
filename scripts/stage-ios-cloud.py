@@ -4,13 +4,13 @@ import json
 import zipfile
 from pathlib import Path
 
-TREES = ['src', 'hub', 'sshcore', 'public/licenses', 'android/app/src/main',
+TREES = ['src', 'hub', 'sdk', 'sshcore', 'public/licenses', 'android/app/src/main',
          'ios/App/App', 'ios/App/App.xcodeproj', 'ios/App/CapApp-SPM', '.github/workflows']
 SINGLE = ['package.json', 'package-lock.json', 'tsconfig.json', 'vite.config.ts', 'capacitor.config.ts', 'index.html',
           '.gitignore', 'README.md', 'IOS_CLOUD.md', 'ORIGINAL_REMOTE_PARITY_AR.md', 'android/build.gradle', 'android/app/build.gradle',
           'public/THIRD_PARTY_NOTICES.txt', 'public/manifest.webmanifest', 'public/icon.svg',
           'ios/debug.xcconfig', 'scripts/build-ios.sh', 'scripts/build-ssh.mjs',
-          'scripts/build-identity.mjs', 'scripts/sync-remote-page.mjs', 'scripts/package-ios-unsigned.py', 'scripts/stage-ios-cloud.py',
+          'scripts/build-identity.mjs', 'scripts/stage-ui.mjs', 'scripts/sync-web-account.mjs', 'scripts/sync-remote-page.mjs', 'scripts/package-ios-unsigned.py', 'scripts/stage-ios-cloud.py', 'REMOTE_DEVELOPMENT.md', 'AGENTS.md',
           'tests/test_ios_distribution.py']
 DENIED_PARTS = {'node_modules', 'build', 'Pods', '.build', 'public', '.data', '.vercel', '__pycache__',
                 '.git', '_CodeSignature'}

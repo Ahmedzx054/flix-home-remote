@@ -4,6 +4,7 @@ import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import { request } from './api.ts';
 import { VERSION, BUILD_ID } from './build-info.ts';
+import { AccessGate } from './access.ts';
 export interface AccountSession { url: string; sessionToken: string; account: { id: string; email: string } }
 interface Vault { saveSession(input: { value: string }): Promise<void>; readSession(): Promise<{ value?: string }>; clearSession(): Promise<void> }
 const vault = registerPlugin<Vault>('HomeDiscovery');
@@ -18,6 +19,13 @@ export let messages: { role: 'user' | 'support'; text: string; at: number }[] = 
 // Memory-only: reopening the app never restores control permission.
 export let control: ControlGrant | undefined;
 let installationId = '', problem = '';
+export const accessGate = new AccessGate(async () => {
+  if (!account) throw new Error('سجّل دخول حساب FLIX لاستخدام الريموت.');
+  const session = account;
+  const reply = await request<{ access: { enabled: boolean; reason: string; checkedAt: number } }>(session.url, '/api/home-remote/access', session.sessionToken, 'POST', { installationId, platform: Capacitor.getPlatform(), version: VERSION, buildId: BUILD_ID });
+  if (account !== session) throw new Error('تغير حساب FLIX.');
+  return reply.access;
+});
 let syncQueue: Promise<void> = Promise.resolve();
 let events: DiagnosticEvent[] = [], resolved: string[] = [], pendingResults: Result[] = [];
 const clean = (v: string) => v.replace(/Bearer\s+\S+/gi, 'Bearer [redacted]').replace(/\b[A-Za-z0-9_-]{40,}\b/g, '[redacted]').slice(0, 300);
@@ -28,6 +36,7 @@ export async function initSupport() {
   try { const { value } = await Preferences.get({ key: 'home-remote-diagnostics' }); if (value) { const saved = JSON.parse(value); ({ installationId = '', reportId = '', problem = '', events = [], resolved = [], pendingResults = [] } = saved); } } catch { /* local recovery */ }
   sharing = false; control = undefined; installationId ||= crypto.randomUUID();
   try { const value = Capacitor.isNativePlatform() ? (await vault.readSession())?.value : sessionStorage.getItem('home-remote-account'); if (value) { account = JSON.parse(value); account!.url = accountUrl(account!.url); await verifyAccount(); } } catch { account = undefined; }
+  accessGate.reset();
   await persist();
 }
 export async function login(url: string, email: string, password: string) {
@@ -36,11 +45,14 @@ export async function login(url: string, email: string, password: string) {
   if (!result.sessionToken || !result.account?.email) throw new Error('لم تعد خدمة FLIX جلسة دخول صالحة.');
   if (account?.account.id !== result.account.id || account?.url !== url) { reportId = ''; sharing = false; control = undefined; actions = []; resolved = []; pendingResults = []; problem = ''; events = []; messages = []; }
   account = { url, sessionToken: result.sessionToken, account: result.account };
+  accessGate.reset();
   const value = JSON.stringify(account); if (Capacitor.isNativePlatform()) await vault.saveSession({ value }); else sessionStorage.setItem('home-remote-account', value);
   await persist();
+  await accessGate.refresh();
 }
 export async function verifyAccount() { if (!account) return; const result = await request<{ account: AccountSession['account'] }>(account.url, '/api/home-remote/account/session', account.sessionToken); if (!result.account?.email) throw new Error('تحقق الحساب غير متاح.'); account.account = result.account; }
 export async function logout() {
+  accessGate.reset();
   await stopSharing(); const previous = account; account = undefined; actions = []; reportId = ''; resolved = []; pendingResults = []; problem = ''; events = []; messages = [];
   if (Capacitor.isNativePlatform()) await vault.clearSession(); else sessionStorage.removeItem('home-remote-account'); await persist();
   if (previous) await request(previous.url, '/api/home-remote/account/logout', previous.sessionToken, 'POST', {}).catch(() => undefined);

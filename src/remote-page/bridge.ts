@@ -1,7 +1,7 @@
 import type { Command, Device, Capabilities, TvApp, PackageEntry } from '../model.ts';
 import { VERSION, BUILD_ID } from '../build-info.ts';
 type Tv=Device & {capabilities:Capabilities};
-export type Utility='support'|'library'|'pair'|'manual'|'settings'|'devices';
+export type Utility='support'|'problem'|'library'|'pair'|'manual'|'settings'|'devices';
 export interface PageHost {
  api<T>(path:string,method?:string,data?:unknown):Promise<T>;
  selected():string;
@@ -21,7 +21,7 @@ export function createPageBridge(h:PageHost){
  return async function request(route:string,method='GET',body:Record<string,any>={}){
   const url=new URL(route,'https://phone.invalid'),action=url.pathname,started=Date.now();let deviceId='';let chosen:Tv|undefined;
   try{
-   if(action==='/api/native-panel'){if(!['support','library','pair','manual','settings','devices'].includes(body.panel))throw Error('نافذة غير صالحة');h.open(body.panel,body.host);return{ok:true};}
+   if(action==='/api/native-panel'){if(!['support','problem','library','pair','manual','settings','devices'].includes(body.panel))throw Error('نافذة غير صالحة');h.open(body.panel,body.host);return{ok:true};}
    if(action==='/api/voice/warm')return{ok:true};
    if(action==='/api/discover'){
     scanning ||= h.api<any>('/api/scan','POST',{}).finally(()=>{scanning=undefined;});
@@ -35,6 +35,7 @@ export function createPageBridge(h:PageHost){
    const call=<T>(operation:string,data?:unknown,verb='POST')=>h.api<T>(path(d)+'/'+operation,verb,data);
    if(action==='/api/state'){let connected=false;if(d.paired){try{connected=!!(await call<any>('page-operation',{operation:'connection'})).connected;}catch{}}return{ok:true,connected,paired:(await list()).filter(x=>x.paired).map(x=>x.host),defaultHost:d.host};}
    if(action==='/api/tv-targets')return{ok:true,targets:(await list()).map(x=>({id:'__direct__@'+x.host,name:x.name,label:x.name,direct:true}))};
+   if(action==='/api/app-icon')return call<{icon:string}>('icon?appId='+encodeURIComponent(url.searchParams.get('appId')||''),undefined,'GET');
    if(action==='/api/apps-on-tv'){if(!d.paired)return{ok:false,apps:[],message:'اقرن التلفزيون أولًا'};const r=await call<{apps:TvApp[]}>('apps',undefined,'GET');return{ok:true,apps:r.apps.map(a=>({...a,title:a.label}))};}
    if(action==='/api/tv-apps'){const r=await h.api<{packages:PackageEntry[]}>('/api/packages');return{ok:true,platform:d.platform,device:true,apps:r.packages.filter(p=>p.platform===d.platform).map(p=>({id:p.id,key:p.id,app:p.id,label:p.name,version:p.version,file:p.filename})),note:'أضف حزمة متوافقة من تطبيقاتي'};}
    if(action==='/api/tv-install'){h.open('library',d.host);throw Error('راجع الحزمة والتلفزيون في نافذة تطبيقاتي ثم وافق على التثبيت.');}
