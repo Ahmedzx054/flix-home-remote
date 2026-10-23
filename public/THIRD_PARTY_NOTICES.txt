@@ -1,0 +1,11 @@
+FLIX Home Remote v0.3
+
+Go 1.25.x and golang.org/x/crypto v0.43.0: BSD, see licenses/Go.txt and licenses/x-crypto.txt.
+libadb-android 3.1.1: Copyright 2021 Muntashir Al-Islam. Apache-2.0 option selected. https://github.com/MuntashirAkon/libadb-android/tree/3.1.1
+spake2-android 2.2.1: Copyright 2021 Muntashir Al-Islam. LGPL-3.0. Exact corresponding upstream source: licenses/spake2-2.2.1-source.zip and https://github.com/MuntashirAkon/spake2-java/tree/2.2.1
+This unmodified Gradle dependency can be replaced/relinked by changing its dependency in android/app/build.gradle and rebuilding the app; source and build instructions are supplied with this project. Reverse engineering for debugging modifications to LGPL components is permitted.
+Conscrypt 2.5.3: Apache-2.0. https://github.com/google/conscrypt/tree/2.5.3
+Bouncy Castle 1.81: MIT-style license, https://www.bouncycastle.org/licence.html
+ADBCore iOS revision 22902f6231c413f2d90accee68f0e59f1c9ea360: MIT, https://github.com/h33h/iadb-ios
+Node dependency license texts: licenses/node-dependencies.txt
+License copies are bundled under licenses/. No upstream library was modified.

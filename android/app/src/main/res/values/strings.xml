@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">ريموت البيت</string>
+    <string name="title_activity_main">ريموت البيت</string>
+    <string name="package_name">com.flix.homeremote</string>
+    <string name="custom_url_scheme">com.flix.homeremote</string>
+</resources>

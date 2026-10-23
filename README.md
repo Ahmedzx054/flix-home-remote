@@ -1,2 +1,155 @@
-# flix-home-remote
-Arabic-first direct phone-to-TV LAN remote. Native iPhone/Android adapter sources for Android TV, webOS, Tizen and Roku; capability checks and consent-based support. Early-stage MIT project; physical-device acceptance pending.
+# FLIX Home Remote — ريموت فلكس
+
+Early-stage, Arabic-first phone-to-TV LAN remote. The phone connects directly
+to the TV; a household computer relay is not required. This standalone
+release includes Capacitor/Vite UI, iOS build project, Android adapter source,
+and protocol adapters for Android/Google TV, webOS, Tizen and Roku.
+
+Original code is licensed under MIT; dependencies retain their own licenses.
+See LICENSE, public/THIRD_PARTY_NOTICES.txt and public/licenses/.
+The spake2 LGPL component includes corresponding source and relinking guidance.
+
+The FLIX account/admin backend and its data are not included. Direct TV
+control is local; optional FLIX support requires an authorized account and
+explicit, temporary device consent. The app does not need an OpenAI API key.
+
+## Reproduce the standalone iOS build
+
+Use Node.js 22+, Go matching sshcore/go.mod and Xcode 27.1 / Swift 6.4 or later.
+Run `npm ci`, `npm run typecheck`, `npm run build`, then
+`python -m unittest discover -s tests -p 'test_ios_*.py' -v`.
+On macOS run `bash scripts/build-ios.sh unsigned`, or use the iPhone cloud
+build workflow in this repository. Unsigned IPA files require your own Apple
+signing before installation; see IOS_CLOUD.md for the Windows signing path.
+This bounded release includes the iOS distribution tests; the broader local
+test suite, verification reports and complete Android build scaffolding are
+not included. Historical test counts in the Arabic guide are local records.
+
+## Current limits
+
+Physical iPhone/TV acceptance is pending. Protocol support in source is not
+proof of compatibility with every television. Discovery, current activity,
+settings and package installation depend on the TV's exposed capabilities,
+developer permissions and owner approval. APK, IPK and WGT are distinct formats.
+Phone support sessions require the app to stay in the foreground.
+
+Public source: https://github.com/Ahmedzx054/flix-home-remote
+Android development APK and usage page: https://flix-admin-tan.vercel.app/home-remote.html
+No adoption or download metrics are claimed for this new open-source release.
+
+## دليل الاستخدام العربي
+
+# ريموت البيت — FLIX — 0.4.0
+
+الهاتف يتصل بالتلفزيون مباشرة على Wi-Fi، دون كمبيوتر أو Node أو adb server في البيت. الحساب وقناة الدعم يستخدمان خدمة FLIX عبر HTTPS. التحكم يحتاج التطبيق الأصلي؛ المتصفح يعرض الواجهة فقط.
+
+## التسليم والاستخدام
+
+- Android: `releases/home-remote-android-debug.apk`، نسخة تطوير موقعة وليست إصدار متجر؛ الهوية والبصمة في `evidence/android.json`.
+- iPhone: ‏`releases/HomeRemote-unsigned.ipa`، نسخة جهاز 0.4.0/build5 جُمّعت فعليا على Xcode 27.1 وSwift 6.4. تحتاج توقيعا بحساب Apple العادي من Windows عبر AltStore ثم تجربة الهاتف؛ لا يلزم امتلاك Mac. هوية البناء وبصمته وخطوات التثبيت في `IOS_CLOUD.md`.
+- مدخل FLIX: `/remote` ← `/home-remote.html` وتنزيل `/home-remote/android.apk`؛ منشور في FLIX Admin. التحقق وحدوده في `VERIFICATION.md`.
+
+ثبّت التطبيق واسمح بالشبكة المحلية. صل الهاتف والتلفزيون بالشبكة نفسها؛ شبكات الضيوف وعزل العملاء قد تمنع الاتصال. ابحث أو أضف IPv4 المحلي ونظام الشاشة، اخترها ثم اقترن ووافق عليها. البحث يعمل عند الفتح والطلب والاستئناف؛ لا يعد باكتشاف دائم والتطبيق مغلق.
+
+تظهر التطبيقات والإعدادات التي يعيدها الجهاز. Android يبدأ بقائمة LEANBACK ثم يستخرج الاسم المحلي وأيقونة PNG/WebP/JPEG أو Vector البسيطة من موارد APK المثبت، على الهاتف مباشرة دون تشغيل كوده أو رفعه للخادم. القراءة جزئية ومحدودة، وتلغى عند تغيير الشاشة. موارد split أو الملفات المحمية أو الرسومات غير المدعومة تبقي معرف الحزمة والرمز البديل؛ لا أسماء أو أيقونات مخمنة. افتح «تجهيز تثبيت التطبيقات» للشاشة ثم أضف حزمة نظامها، وراجع الشاشة والمعرف والبصمة ثم أكد. أبق الهاتف مفتوحا أثناء النقل. من «حسابك والمساعدة» ادخل بنفس بريد وكلمة مرور FLIX وشارك التشخيص مع مشغل الدعم، أو أوقف المشاركة وصدّر التشخيص. لا يحتاج المسار مزود AI أو اشتراك OpenAI.
+
+## تثبيت LG من الهاتف
+
+1. على LG افتح Developer Mode وسجّل بحساب LG Developer وفعّل Dev Mode وKey Server. المالك ينفذ التمكين وأي إعادة تشغيل مطلوبة.
+2. اختر LG ثم «تجهيز تثبيت التطبيقات» واكتب Passphrase الظاهر في الشاشة **داخل التطبيق**، دون إرساله في المحادثة.
+3. يقرأ الهاتف مفتاح المطور من التلفزيون على 9991 ويتصل SSH على 9922 باسم prisoner. أول اتصال يعرض بصمة SHA-256؛ تحقق من عنوان الشاشة وقارن البصمة إن كانت متاحة، ثم وافق. تغير البصمة المحفوظة يوقف الاتصال.
+4. بعد التفويض تحفظ بيانات المطور في خزنة الهاتف. أضف IPK صالحا وراجعه وثبته. ينقل الهاتف الحزمة ويطلب التثبيت عبر خدمة webOS وينتظر تأكيد النظام وينظف الملف المؤقت.
+
+Key Server مطلوب عند التجهيز؛ التثبيت اللاحق يستخدم المفتاح المحفوظ ما دامت جلسة المطور صالحة. مدة Developer Mode وصلاحياته تحددهما LG؛ التطبيق لا يتجاوزهما.
+
+## تثبيت Samsung من الهاتف
+
+1. فعّل Developer Mode في Apps وحدد عنوان IP المحلي **للهاتف** جهازا مسموحا للمطور. المالك ينفذ أي إعادة تشغيل مطلوبة.
+2. جهّز WGT موقعة بشهادة Samsung التي تسمح بالتلفزيون، وتصريح DUID عندما تتطلبه الشهادة. التطبيق لا يولد شهادة Samsung أو توقيعا دون حسابك ومواد التوقيع.
+3. اختر Samsung ثم «تجهيز تثبيت التطبيقات». منفذ SDB الافتراضي 26101 قابل للتغيير؛ يختبر الهاتف الاتصال والقدرات قبل إتاحة التثبيت.
+4. أضف WGT ومعرف التطبيق الكامل المطابق لـ`config.xml`، مثل `PACKAGEID.AppName`. يفحص التطبيق التعريف ووجود ملفات توقيع المؤلف والموزع؛ التلفزيون يتحقق من **صحة التوقيع**.
+5. راجع وأكد. ينقل SDB الحزمة ويطلب `vd_appinstall` ويفحص النتيجة وينظف الملف المؤقت؛ الرفض يظهر في الإيصال والتشخيص.
+
+## اقتران TCL / Android / Google TV برمز
+
+TCL علامة تجارية؛ اختر Android إذا كان نظام الشاشة Android/Google TV، وRoku إذا كان نظامها Roku.
+
+1. على الشاشة فعّل Wireless Debugging وافتح «Pair device with pairing code». هذا الإذن المحمي يحتاج المالك أولا.
+2. أدخل العنوان و**منفذ الاتصال** من صفحة Wireless Debugging، ثم **منفذ الاقتران** والرمز الحالي ذي الست خانات من نافذة الاقتران. المنفذان مختلفان وقد يتغيران؛ تقبل الواجهة الأرقام العربية والفارسية.
+3. ينفذ Java/Swift اقتران ADB TLS داخل الهاتف دون حفظ الرمز، ثم يستخدم منفذ الاتصال. تدعم أجهزة ADB TCP القديمة مع موافقة RSA أيضا.
+4. تظهر صفحات الإعدادات التي يحلها الجهاز فعليا: الشبكة وBluetooth والعرض والصوت والتطبيقات والمطور. APK ينقل مباشرة عبر ADB sync وpm install مع تأكيد ونتيجة.
+
+## التوافق وحدوده
+
+| النظام | التحكم والتطبيقات | الإعدادات | حزمة من الهاتف |
+|---|---|---|---|
+| LG webOS | SSAP/WebSocket وتفويض الشاشة؛ التطبيقات وأيقوناتها المتاحة وفتحها | صوت/كتم/مداخل إن أعادها الجهاز وفتح الإعدادات | IPK عبر SSH/WASM بعد تجهيز المطور |
+| Samsung Tizen | WebSocket وتفويض الشاشة؛ قائمة التطبيقات إن أتاحها الموديل | فتح القائمة والتنقل فيها | WGT موقعة عبر SDB بعد السماح للهاتف |
+| Android / Google TV / TCL المتوافق | ADB TCP أو TLS برمز؛ LEANBACK وفتحها، معرفات وأيقونات بديلة | صفحات يحلها النظام فعليا، لا كل القيم المحمية | APK عبر ADB sync |
+| Roku TV | ECP إن سمحت الشاشة؛ تطبيقات وأيقونات وفتح | أزرار وتنقل، لا واجهة عامة لكل الإعدادات | لا APK/IPK/WGT |
+| غير معروف | تحديد النظام مطلوب | لا قدرات مفترضة | غير متاح |
+
+وجود شاشة على Wi-Fi لا يضمن دعم البروتوكول. لا تتحول حزمة iPhone إلى تطبيق تلفزيون، ولا يعمل APK على LG/Tizen؛ يلزم بناء TV لكل نظام. الإرشادات لا تتجاوز موافقات المطور والتوقيع والقيود المحمية.
+
+## الدعم والتحكم عن بعد عبر الهاتف
+
+الهاتف هو منفذ أوامر التلفزيون داخل شبكة البيت. لوحة FLIX وCLI يقرآن التشخيص ويرسلان إجراءات محددة إلى الهاتف عبر HTTPS؛ الهاتف ينفذها مباشرة على LAN ويرجع النتيجة. أبق التطبيق في الواجهة. لا يحتاج كمبيوتر منزليا أو مفتاح مزود AI أو اشتراك API. المحادثة الحالية ليست خدمة مراقبة دائمة؛ يقرأ المشغل/Codex البلاغ عند تشغيل جسر الدعم بجلسة إدارة مأذونة.
+
+- `/api/home-remote/account/*` يعيد استخدام AccountService القائم. البريد ومعرف الحساب يأتيان من الجلسة الموثقة. البلاغ والمحادثة ونتائج الأوامر معزولة لكل حساب.
+- مشاركة التشخيص اختيارية وتشمل الأجهزة وآخر فحص والأخطاء والتطبيقات والإعدادات والحزم وإيصالات التثبيت. النشاط الجاري يرسل فقط إذا كشفه التلفزيون: Android قد يكشف اسم المحتوى، LG يكشف التطبيق، Samsung قد لا يكشف النشاط. الحالة غير المتاحة تظهر صراحة.
+- كلمة المرور ومفاتيح الشاشة ورمز الاقتران وملفات الحزم وملفات dumpsys الخام لا ترسل إلى الدعم.
+- موافقة التحكم من الهاتف لمدة 15 دقيقة لشاشة واحدة. أوامر الأزرار وفتح تطبيق مبلغ عنه وتغيير إعداد متاح والفحص يمكن تنفيذها خلالها. ينتهي الإذن بالخروج للخلفية أو إعادة تشغيل التطبيق أو زر الإلغاء. انقطاع الهاتف يوقف التنفيذ وتصبح حالة الخادم قديمة خلال 90 ثانية.
+- الاقتران والتثبيت والإطفاء تحتاج مراجعة مستقلة. التثبيت يستخدم حزمة متوافقة محفوظة على الهاتف ويعرض تأكيدا ثانيا؛ لا يرسل المشغل shell عاما ولا يتجاوز صلاحيات المطور.
+- الإجراءات تحمل صلاحية ونتيجة استلام ونتيجة نهائية؛ يسجل الهاتف استهلاك الإجراء قبل التنفيذ ويعيد إرسال الإيصال عند عودة الشبكة لمنع التكرار. حالة `sent` تعني نجاح طلب البروتوكول، ولا تثبت تغير الصورة فعليا. نتيجة التثبيت منفصلة في الإيصالات.
+- المزامنة كل 5 ثوان أثناء الواجهة مع تشخيص دوري؛ حفظ القوائم في التخزين المشترك يستخدم read/modify/write، وليس ضمانا ذريّا لتزامن عدة مشغلين. إصلاح مصدر التطبيق يحتاج بناء وتوزيع إصدار جديد.
+
+لوحة المشغل: https://flix-admin-tan.vercel.app/home-remote-support.html . تتطلب جلسة FLIX Admin القائمة؛ لا تفتح للعامة.
+
+```powershell
+# جلسة الإدارة المأذونة في FLIX_SUPPORT_ADMIN_COOKIE؛ لا تطبعها ولا ترسلها في الدردشة
+node scripts/support-client.mjs list --email user@example.com
+node scripts/support-client.mjs report --id REPORT_UUID
+node scripts/support-client.mjs reply --id REPORT_UUID --message "وصل التشخيص"
+node scripts/support-client.mjs propose --id REPORT_UUID --type inspect --tv TV_UUID --message "فحص الاتصال"
+node scripts/support-client.mjs propose --id REPORT_UUID --type command --tv TV_UUID --command ok --message "اختبار الزر"
+node scripts/support-client.mjs propose --id REPORT_UUID --type install --tv TV_UUID --package PACKAGE_UUID --message "مراجعة الحزمة"
+```
+
+## المعمارية والبيانات
+
+`src/direct/engine.ts` يدير الأجهزة والحزم والقدرات؛ `adapters.ts` بروتوكولات الشاشة؛ `socket.ts` WebSocket؛ `adb.ts` ADB المباشر؛ `sdb.ts` SDB؛ `webos-install.ts` يستدعي Go/WASM في `sshcore/`. Java يوفر DirectLan/DirectAdb وSwift يوفرهما في `HomeDiscoveryPlugin.swift`. ADB TLS يستخدم libadb-android وADBCore المثبت على revision محدد. `hub/` مرجع تطوير لا يدخل حزمة الهاتف أو مسار المستخدم.
+
+قناة التلفزيون تقبل IPv4 محليا خاصا أو link-local؛ لا DNS عام أو تحويل HTTP. استثناء شهادة التلفزيون ذاتية التوقيع محصور بالقناة المحلية وHTTPS السحابة عادي. تحفظ الأسرار في Android Keystore/AES-GCM أو iOS Keychain، وبيانات الأجهزة في Preferences والحزم حتى 64 MB في Filesystem الخاص. حذف مكتبة الشاشات يمحو رموزها ومفاتيح LG وبصماتها؛ تبقى هوية ADB الخاصة **بالهاتف** ثابتة لتفويض عدة شاشات. لإبطالها على التلفزيون استخدم إلغاء تفويضات المطور فيه.
+
+التراخيص والإشعارات في `public/THIRD_PARTY_NOTICES.txt` و`public/licenses/` وتدخل الحزمة، بما فيها مصدر spake2 المطابق للمكتبة.
+
+## البناء والتوزيع
+
+يلزم Node وGo 1.25 أو أحدث متوافق وAndroid SDK/JDK. Windows يستخدم `.toolchain/go/bin/go.exe`؛ يمكن ضبط `FLIX_GO` لمسار Go المثبت. Mac يستخدم `go`.
+
+```powershell
+npm ci
+npm run typecheck
+npm test
+powershell -NoProfile -File scripts/build-android.ps1
+powershell -NoProfile -File scripts/verify-native.ps1
+node scripts/stage-release.mjs
+```
+
+`verify-native` يفحص توقيع APK وهويته وDEX وWASM، وXML ومراجع iOS فقط. `stage-release` ينسخ APK وrelease.json إلى `../flix-s/public/home-remote/` محليا دون نشر. APK مستثنى من Git ويعاد تجهيزه قبل النشر المعتمد. ينشر flix-admin للحساب والدعم والتنزيل ومدخل /remote؛ لا يلزم نشر FLIX S لتوزيع الهاتف. مرشح الإنتاج يستعيد مصدر Admin الحي ويتحقق من بصماته قبل إضافة الدعم حفاظا على إصلاحات الحسابات. تفاصيل النشر الحالي في PUBLIC_RELEASE.md.
+
+دون Mac محلي: نفذ `python scripts/stage-ios-cloud.py` لتجهيز مصدر مستقل خاص ثم اتبع `IOS_CLOUD.md`. Workflow GitHub يبني جهاز ARM64 غير موقع على `xcode-27` للتوقيع عبر Windows بحساب Apple عادي. SSDP يحتاج multicast entitlement معتمدا لا يدخل هذا المسار؛ Bonjour للخدمات المعلنة أو إدخال IPv4 بدائل تستلزم إذن الشبكة المحلية. لا يمثل تجهيز المصدر أو `cap sync ios` نجاح تجميع Swift.
+
+على Mac محلي أو سحابي يمكن تشغيل `bash scripts/build-ios.sh unsigned` لبناء IPA يحتاج توقيع المستخدم، أو `simulator` للتحقق من التجميع فقط، أو `FLIX_APPLE_TEAM=TEAM_ID bash scripts/build-ios.sh archive` بعد تجهيز التوقيع. لتصدير الأرشيف الموقع اضبط `FLIX_IOS_EXPORT_OPTIONS` على ملف ExportOptions.plist الخاص بفريقك. السكربت يفحص Swift 6.4 ولا يرفع إلى المتجر. بناء الجهاز السحابي #39952010968 نجح؛ التوقيع والتثبيت وقبول iPhone/TV لم تنفذ بعد.
+
+القبول على هاتف وشاشات حقيقية مستقل عن نجاح البناء واختبارات البروتوكولات الاصطناعية. راجع `VERIFICATION.md` و`PUBLIC_RELEASE.md` لهوية النسخة والقيود الحالية.
+
+## المصادر الأساسية
+
+- [LG Developer Mode](https://webostv.developer.lge.com/develop/getting-started/developer-mode-app)
+- [Samsung TV certificates](https://developer.samsung.com/smarttv/develop/getting-started/setting-up-sdk/creating-certificates.html)
+- [Apple local network privacy](https://developer.apple.com/documentation/technotes/tn3179-understanding-local-network-privacy)
+- [Android ADB](https://developer.android.com/tools/adb)
+- [Android binary resources](https://android.googlesource.com/platform/frameworks/base/+/master/libs/androidfw/include/androidfw/ResourceTypes.h)
+- [Android VectorDrawable](https://developer.android.com/reference/android/graphics/drawable/VectorDrawable)
+- [Roku ECP](https://developer.roku.com/docs/developer-program/dev-tools/external-control-api.md)
