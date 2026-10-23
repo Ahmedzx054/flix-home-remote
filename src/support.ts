@@ -27,7 +27,7 @@ export function accountUrl(value: string) { const url = new URL(value); if (url.
 export async function initSupport() {
   try { const { value } = await Preferences.get({ key: 'home-remote-diagnostics' }); if (value) { const saved = JSON.parse(value); ({ installationId = '', reportId = '', problem = '', events = [], resolved = [], pendingResults = [] } = saved); } } catch { /* local recovery */ }
   sharing = false; control = undefined; installationId ||= crypto.randomUUID();
-  try { const value = Capacitor.isNativePlatform() ? (await vault.readSession()).value : sessionStorage.getItem('home-remote-account'); if (value) { account = JSON.parse(value); account!.url = accountUrl(account!.url); await verifyAccount(); } } catch { account = undefined; }
+  try { const value = Capacitor.isNativePlatform() ? (await vault.readSession())?.value : sessionStorage.getItem('home-remote-account'); if (value) { account = JSON.parse(value); account!.url = accountUrl(account!.url); await verifyAccount(); } } catch { account = undefined; }
   await persist();
 }
 export async function login(url: string, email: string, password: string) {

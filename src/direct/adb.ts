@@ -2,7 +2,14 @@ import { Adb, AdbDaemonTransport, type AdbCredentialStore, type AdbPrivateKey, t
 import { Consumable, MaybeConsumable, ReadableStream, WritableStream } from '@yume-chan/stream-extra';
 import { Lan, NativeAdb, localHost, from64, to64, Vault } from './native.ts';
 let secrets: Record<string,string> = {}; let save = Promise.resolve();
-export async function loadSecrets() { const r=await Vault.readSession({key:'tv-secrets'}); secrets=r.value ? JSON.parse(r.value) : {};const identity=await Vault.readSession({key:'phone-adb-identity'});if(identity.value)secrets.adb=identity.value;else if(secrets.adb)await Vault.saveSession({key:'phone-adb-identity',value:secrets.adb}); }
+export async function loadSecrets() {
+  // Older iOS bridges resolve without an object when this phone has no TV keys yet.
+  const stored = await Vault.readSession({key:'tv-secrets'});
+  secrets = stored?.value ? JSON.parse(stored.value) : {};
+  const identity = await Vault.readSession({key:'phone-adb-identity'});
+  if (identity?.value) secrets.adb = identity.value;
+  else if (secrets.adb) await Vault.saveSession({key:'phone-adb-identity',value:secrets.adb});
+}
 export function getSecrets() { return secrets; }
 export function saveSecrets() { const value=JSON.stringify(secrets); save=save.catch(()=>{}).then(()=>Vault.saveSession({key:'tv-secrets',value})); return save; }
 const credentials: AdbCredentialStore = {

@@ -45,21 +45,27 @@ public class HomeDiscoveryPlugin extends Plugin {
         }
         return (SecretKey) keys.getKey(alias, null);
     }
+    private String vaultEntry(PluginCall call) {
+        String key = call.getString("key", "");
+        if ("tv-secrets".equals(key)) return "tv-secrets";
+        if ("phone-adb-identity".equals(key)) return "phone-adb-identity";
+        return "session";
+    }
     @PluginMethod public void saveSession(PluginCall call) {
         try {
             String value = call.getString("value", ""); if (value.length() > 16384) { call.reject("جلسة غير صالحة"); return; }
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding"); cipher.init(Cipher.ENCRYPT_MODE, sessionKey());
             String encoded = Base64.encodeToString(cipher.getIV(), Base64.NO_WRAP) + ":" + Base64.encodeToString(cipher.doFinal(value.getBytes(java.nio.charset.StandardCharsets.UTF_8)), Base64.NO_WRAP);
-            getContext().getSharedPreferences("account-vault", Context.MODE_PRIVATE).edit().putString("tv-secrets".equals(call.getString("key")) ? "tv-secrets" : "session", encoded).commit(); call.resolve();
+            getContext().getSharedPreferences("account-vault", Context.MODE_PRIVATE).edit().putString(vaultEntry(call), encoded).commit(); call.resolve();
         } catch (Exception error) { call.reject("تعذر حفظ الجلسة الآمن"); }
     }
     @PluginMethod public void readSession(PluginCall call) {
         try {
-            String value = getContext().getSharedPreferences("account-vault", Context.MODE_PRIVATE).getString("tv-secrets".equals(call.getString("key")) ? "tv-secrets" : "session", ""); JSObject result = new JSObject();
+            String value = getContext().getSharedPreferences("account-vault", Context.MODE_PRIVATE).getString(vaultEntry(call), ""); JSObject result = new JSObject();
             if (!value.isEmpty()) { String[] parts = value.split(":"); Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding"); cipher.init(Cipher.DECRYPT_MODE, sessionKey(), new GCMParameterSpec(128, Base64.decode(parts[0], Base64.NO_WRAP))); result.put("value", new String(cipher.doFinal(Base64.decode(parts[1], Base64.NO_WRAP)), java.nio.charset.StandardCharsets.UTF_8)); }
             call.resolve(result);
         } catch (Exception error) { call.reject("تعذرت قراءة الجلسة؛ سجّل الدخول مجددًا"); }
     }
-    @PluginMethod public void clearSession(PluginCall call) { getContext().getSharedPreferences("account-vault", Context.MODE_PRIVATE).edit().remove("tv-secrets".equals(call.getString("key")) ? "tv-secrets" : "session").commit(); call.resolve(); }
+    @PluginMethod public void clearSession(PluginCall call) { getContext().getSharedPreferences("account-vault", Context.MODE_PRIVATE).edit().remove(vaultEntry(call)).commit(); call.resolve(); }
 
 }

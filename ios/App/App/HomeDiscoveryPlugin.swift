@@ -62,7 +62,15 @@ public class HomeDiscoveryPlugin: CAPPlugin, CAPBridgedPlugin {
             else { try? AVAudioSession.sharedInstance().setActive(false); call.reject("تعذر تشغيل الميكروفون") }
         }
     }
-    private func keychainQuery(_ call: CAPPluginCall) -> [String: Any] { [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: "com.flix.homeremote", kSecAttrAccount as String: call.getString("key") == "tv-secrets" ? "tv-secrets" : "account-session"] }
+    private func keychainQuery(_ call: CAPPluginCall) -> [String: Any] {
+        let account: String
+        switch call.getString("key") {
+        case "tv-secrets": account = "tv-secrets"
+        case "phone-adb-identity": account = "phone-adb-identity"
+        default: account = "account-session"
+        }
+        return [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: "com.flix.homeremote", kSecAttrAccount as String: account]
+    }
     @objc public func saveSession(_ call: CAPPluginCall) {
         guard let value = call.getString("value"), value.utf8.count <= 16384 else { call.reject("جلسة غير صالحة"); return }
         let data = Data(value.utf8)
@@ -74,7 +82,7 @@ public class HomeDiscoveryPlugin: CAPPlugin, CAPBridgedPlugin {
     @objc public func readSession(_ call: CAPPluginCall) {
         var query = keychainQuery(call); query[kSecReturnData as String] = true; query[kSecMatchLimit as String] = kSecMatchLimitOne
         var value: CFTypeRef?; let status = SecItemCopyMatching(query as CFDictionary, &value)
-        if status == errSecItemNotFound { call.resolve(); return }
+        if status == errSecItemNotFound { call.resolve([:]); return }
         guard status == errSecSuccess, let data = value as? Data, let text = String(data: data, encoding: .utf8) else { call.reject("تعذرت قراءة الجلسة؛ سجّل الدخول مجددًا"); return }
         call.resolve(["value": text])
     }
