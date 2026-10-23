@@ -21,7 +21,7 @@ const androidSettings:Record<string,{action:string;label:string}>={network:{acti
 const samsungKeys: Record<Command, string> = { up: 'KEY_UP', down: 'KEY_DOWN', left: 'KEY_LEFT', right: 'KEY_RIGHT', ok: 'KEY_ENTER', back: 'KEY_RETURN', home: 'KEY_HOME', volumeUp: 'KEY_VOLUP', volumeDown: 'KEY_VOLDOWN', mute: 'KEY_MUTE', playPause: 'KEY_PLAYPAUSE', powerOff: 'KEY_POWEROFF', settings: 'KEY_MENU',channelUp:'KEY_CHUP',channelDown:'KEY_CHDOWN',rewind:'KEY_REWIND',fastForward:'KEY_FF',info:'KEY_INFO',exit:'KEY_EXIT',play:'KEY_PLAY',pause:'KEY_PAUSE' };
 const rokuKeys: Partial<Record<Command, string>> = { up: 'Up', down: 'Down', left: 'Left', right: 'Right', ok: 'Select', back: 'Back', home: 'Home', volumeUp: 'VolumeUp', volumeDown: 'VolumeDown', mute: 'VolumeMute', playPause: 'Play', powerOff: 'PowerOff',rewind:'Rev',fastForward:'Fwd',info:'Info',exit:'Back' };
 const lgButtons: Partial<Record<Command, string>> = { up: 'UP', down: 'DOWN', left: 'LEFT', right: 'RIGHT', ok: 'ENTER', back: 'BACK', home: 'HOME', settings: 'MENU',channelUp:'CHANNELUP',channelDown:'CHANNELDOWN',info:'INFO',exit:'EXIT',playPause:'PLAY' };
-const LG_PERMISSIONS = ['LAUNCH', 'CONTROL_AUDIO', 'CONTROL_INPUT_MEDIA_PLAYBACK', 'CONTROL_POWER', 'CONTROL_INPUT_TEXT', 'CONTROL_MOUSE_AND_KEYBOARD', 'READ_INSTALLED_APPS', 'READ_INPUT_DEVICE_LIST', 'READ_APP_STATUS', 'READ_SETTINGS', 'WRITE_NOTIFICATION_ALERT'];
+const LG_PERMISSIONS = ['LAUNCH', 'CONTROL_AUDIO', 'CONTROL_INPUT_MEDIA_PLAYBACK', 'CONTROL_POWER', 'CONTROL_INPUT_TEXT', 'CONTROL_MOUSE_AND_KEYBOARD', 'READ_INSTALLED_APPS', 'READ_INPUT_DEVICE_LIST', 'READ_APP_STATUS', 'READ_RUNNING_APPS', 'READ_SETTINGS', 'WRITE_NOTIFICATION_ALERT'];
 export class Adapters {
   private sessions = new Map<string, TvSocket>();
   private pointers = new Map<string, TvSocket>();
@@ -52,7 +52,9 @@ export class Adapters {
       let pairedKey = key;
       if (d.platform === 'webos') {
         const response = s.wait(m => m.type === 'registered' || (m.id === 'pair' && m.type === 'error'), allowPrompt ? 60000 : 8000);
-        s.send({ id: 'pair', type: 'register', payload: { forcePairing: false, pairingType: 'PROMPT', 'client-key': key || undefined, manifest: { manifestVersion: 1, appVersion: '1.0', permissions: LG_PERMISSIONS } } });
+        // Explicit pairing requests fresh TV approval, including newly requested permissions.
+        // Background reconnects reuse the existing key and never discard it before approval.
+        s.send({ id: 'pair', type: 'register', payload: { forcePairing: false, pairingType: 'PROMPT', 'client-key': allowPrompt ? undefined : key || undefined, manifest: { manifestVersion: 1, appVersion: '1.0', permissions: LG_PERMISSIONS } } });
         pairedKey = (await response).payload?.['client-key'];
         if (!pairedKey) throw new Error('لم يعط التلفزيون مفتاح الاقتران.');
       } else { const m = await samsungResponse!; pairedKey = m.data?.token || key || 'legacy'; }
@@ -305,7 +307,12 @@ export class Adapters {
       return androidActivity(foreground,media);
     }
     if(d.platform==='webos'){
-      const payload=await (await this.socket(d)).request('ssap://com.webos.applicationManager/getForegroundAppInfo');
+      let payload;
+      try { payload=await (await this.socket(d)).request('ssap://com.webos.applicationManager/getForegroundAppInfo'); }
+      catch(error) {
+        if(!/\b401\b.*insufficient permissions|insufficient permissions.*\b401\b/i.test(String(error instanceof Error?error.message:error)))throw error;
+        return {available:false,reason:'التلفزيون لم يسمح بقراءة التطبيق النشط (401). افتح الشاشات والاقتران وأعد الاقتران، ثم وافق على التلفزيون لتحديث الصلاحيات.',checkedAt:Date.now()};
+      }
       return {available:!!payload.appId,appId:String(payload.appId||'').slice(0,200),reason:'يعرض التطبيق النشط؛ عنوان المحتوى غير متاح عبر هذا المسار.',checkedAt:Date.now()};
     }
     if(d.platform==='roku'){
