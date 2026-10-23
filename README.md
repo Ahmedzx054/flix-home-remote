@@ -7,7 +7,7 @@
 ## التسليم والاستخدام
 
 - Android: `releases/home-remote-android-debug.apk`، نسخة تطوير موقعة وليست إصدار متجر؛ الهوية والبصمة في `evidence/android.json`.
-- iPhone: ‏`releases/public-ios-build-3/HomeRemote-unsigned.ipa`، نسخة جهاز0.5.3/build7 جُمّعت فعليا على Xcode27.1. تحتاج توقيعا بحساب Apple العادي من Windows عبر iLoader أو AltStore ثم تجربة الهاتف؛ لا يلزم امتلاك Mac. فحص ARM64/هوية/مصدر الواجهة نجح، والتوقيع/التثبيت وقبول الهاتف والتلفزيون لهذا الإصدار لم ينفذ بعد.
+- iPhone: `releases/public-ios-build-6/HomeRemote-unsigned.ipa`،0.5.3/build9، جهازARM64/Xcode27.1. ملف التنزيل يحتاج توقيع حسابApple منWindows عبرiLoader أوAltStore؛ لاMac محلي مطلوب. [دليل البناء والتجربة](IOS_CLOUD.md).
 - مدخل FLIX: `/remote` ← `/home-remote.html` وتنزيل `/home-remote/android.apk`؛ منشور في FLIX Admin. التحقق وحدوده في `VERIFICATION.md`.
 
 ثبّت التطبيق واسمح بالشبكة المحلية. صل الهاتف والتلفزيون بالشبكة نفسها؛ شبكات الضيوف وعزل العملاء قد تمنع الاتصال. ابحث أو أضف IPv4 المحلي ونظام الشاشة، اخترها ثم اقترن ووافق عليها. البحث يعمل عند الفتح والطلب والاستئناف؛ لا يعد باكتشاف دائم والتطبيق مغلق.
