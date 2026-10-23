@@ -7,6 +7,7 @@ import { Lan, requireNative, localHost, localUrl, from64 } from './native.ts';
 import {prepareWebos,installWebos} from './webos-install.ts';
 import {probeSdb,installTizen} from './sdb.ts';
 import { Adapters,safeAppId } from './adapters.ts';
+import { identifyTelevision, decodeDescription } from './discovery.ts';
 import { getSecrets, loadSecrets, saveSecrets, installApk, closeAndroid } from './adb.ts';
 export interface DirectStore { data: { devices: Device[]; keys: Record<string,string>; packages: PackageEntry[]; receipts: InstallReceipt[] }; save(): Promise<void> }
 const platforms: Platform[]=['webos','tizen','android','roku','unknown'];
@@ -15,7 +16,7 @@ const adapters=new Adapters(directStore);let initialized=false,activeDevice='';c
 export async function initDirect() {requireNative();if(initialized)return;await loadSecrets();const {value}=await Preferences.get({key:'direct-tv-library'});if(value){const saved=JSON.parse(value);directStore.data.devices=Array.isArray(saved.devices)?saved.devices:[];directStore.data.packages=saved.packages||[];directStore.data.receipts=saved.receipts||[];}directStore.data.keys=getSecrets();for(const r of directStore.data.receipts)if(r.status==='installing'){r.status='failed';r.message='انقطع التطبيق قبل تأكيد التثبيت. تحقّق من التلفزيون قبل إعادة المحاولة.';r.endedAt=Date.now();}initialized=true;}
 export function capabilities(d: Device): Capabilities {
   const known=d.platform!=='unknown', paired=known&&d.paired;
-  const commands: Command[]=d.platform==='roku'?['up','down','left','right','ok','back','home','volumeUp','volumeDown','mute','playPause','powerOff']:['up','down','left','right','ok','back','home','volumeUp','volumeDown','mute','playPause','powerOff','settings'];
+  const commands: Command[]=['up','down','left','right','ok','back','home','volumeUp','volumeDown','mute','playPause','powerOff','rewind','fastForward','info','exit',...(d.platform==='roku'?[]:['settings','channelUp','channelDown','play','pause'] as Command[])];
   const guides: Record<Platform,{steps:string[];docs:string}>={
     webos:{steps:['الهاتف يتصل مباشرة بالتلفزيون؛ اسمح بإذن الشبكة المحلية.','فعّل LG Connect Apps / Mobile TV On إن كان موجودًا، ووافق على الاقتران على الشاشة.','التحكم وقراءة التطبيقات لا يتطلبان وضع المطوّر.','تثبيت IPK مخصص يتطلب وضع المطوّر وطريقة نشر يدعمها الموديل؛ جهّز Developer Mode وKey Server، وأدخل Passphrase في مكتبة التطبيقات؛ ينقل الهاتف IPK عبر SSH مباشرة.'],docs:'https://webostv.developer.lge.com/develop/getting-started/developer-mode-app'},
     tizen:{steps:['اسمح بالتحكم عن بعد من مدير اتصال الأجهزة على التلفزيون.','وافق على طلب FLIX Home Remote على الشاشة.','قد لا يُرجع بعض موديلات Samsung قائمة التطبيقات.','تثبيت WGT يتطلب شهادة وتفويض جهاز؛ فعّل Developer Mode من Apps، وأدخل عنوان الهاتف المسموح، ثم جهّز اتصال SDB من المكتبة.'],docs:'https://developer.samsung.com/smarttv/develop/getting-started/using-sdk/tv-device.html'},
@@ -28,23 +29,22 @@ export function capabilities(d: Device): Capabilities {
 }
 function publicDevices() {return directStore.data.devices.map(d=>({...d,capabilities:capabilities(d)}));}
 const parser=new XMLParser({ignoreAttributes:false,attributeNamePrefix:''});
+export let discoveryDiagnostics: Record<string, unknown> = {};
 export async function scanDirect() {
   requireNative();const reply=await Lan.discover();const seen=new Set<string>(),deadline=Date.now()+12000;
+  discoveryDiagnostics={...reply.diagnostics,checkedAt:Date.now(),responses:reply.devices.length,identified:0};
   for(const entry of [...reply.devices].sort((a,b)=>Number(b.service?.includes('adb-tls-connect')||false)-Number(a.service?.includes('adb-tls-connect')||false)).slice(0,100)){
     if(Date.now()>deadline)break;
     try{
-      const host=localHost(entry.host);if(seen.has(host))continue;seen.add(host);let name=entry.name||host,model='',platform:Platform=entry.platform==='android'?'android':'unknown';
-      const location=entry.ssdp?.match(/^location:\s*(.+)$/im)?.[1]?.trim();let description='';
-      if(location){const url=localUrl(location,host);if(!['http:','https:'].includes(url.protocol))continue;const r=await Lan.http({url:url.href,limit:131072});description=new TextDecoder().decode(from64(r.data));if(/<!DOCTYPE|<!ENTITY/i.test(description))continue;const device=parser.parse(description)?.root?.device;name=String(device?.friendlyName||name);model=String(device?.modelName||'');}
-      const text=(description+' '+entry.ssdp+' '+entry.name).toLowerCase();
-      if(/webos|lg electronics|lge.com/.test(text))platform='webos';else if(/samsung|tizen/.test(text))platform='tizen';else if(/roku/.test(text))platform='roku';else if(/android|google|chromecast/.test(text))platform='android';
-      if(platform==='unknown')continue;
+      const host=localHost(entry.host);if(seen.has(host))continue;
+      const identified=await identifyTelevision(entry,async url=>decodeDescription((await Lan.http({url,limit:131072})).data));
+      if(!identified)continue;seen.add(host);const {name,model,platform}=identified;
       const previous=directStore.data.devices.find(d=>d.host===host);
       if(previous){previous.seenAt=Date.now();if(previous.platform==='android'&&!previous.paired&&entry.service?.includes('adb-tls-connect')&&entry.port)previous.port=entry.port;if(previous.platform==='unknown')previous.platform=platform;}
       else if(directStore.data.devices.length<30)directStore.data.devices.push({id:crypto.randomUUID(),name:name.slice(0,100),model:model.slice(0,100),host,platform,port:platform==='android'?entry.port||5555:undefined,paired:false,seenAt:Date.now()});
     }catch{/* One malformed/blocked discovery response cannot cancel other TVs. */}
   }
-  await directStore.save();return {devices:publicDevices()};
+  discoveryDiagnostics.identified=seen.size;await directStore.save();return {devices:publicDevices(),diagnostics:discoveryDiagnostics};
 }
 export async function directApi<T>(route: string,method='GET',input?: any): Promise<T> {
   requireNative();await initDirect();const path=new URL(route,'https://direct.invalid').pathname;const data=input||{};let result:unknown;
@@ -77,6 +77,7 @@ export async function directApi<T>(route: string,method='GET',input?: any): Prom
     else if(operation==='settings'&&method==='GET')result={settings:await adapters.settings(d)};
     else if(operation==='settings'){await adapters.setSetting(d,data.id,data.value);result={ok:true};}
     else if(operation==='command'){await adapters.command(d,data.command);result={ok:true};}
+    else if(operation==='page-operation'){result={ok:true,...await adapters.pageOperation(d,String(data.operation),data)};}
     else if(operation==='launch'){await adapters.launch(d,data.appId);result={ok:true};}
     else if(operation==='icon'){
       const appId=new URL(route,'https://direct.invalid').searchParams.get('appId');const app=(await adapters.apps(d)).find(a=>a.id===appId);if(!app?.icon)throw new Error('الأيقونة غير متاحة.');const url=localUrl(app.icon,d.host);if(!['http:','https:'].includes(url.protocol))throw new Error('أيقونة غير متاحة.');const image=await Lan.http({url:url.href,limit:1024*1024});if(!/^image\/(png|jpeg|webp|gif)(?:;|$)/i.test(image.type))throw new Error('صيغة أيقونة غير مدعومة.');result={icon:'data:'+image.type.split(';')[0]+';base64,'+image.data};

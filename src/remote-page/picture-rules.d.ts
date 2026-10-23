@@ -1,0 +1,11 @@
+type Settings=Record<string,string|number|boolean>;
+type Call=(socket:any,uri:string,params?:any)=>Promise<any>;
+export const PICTURE_KEYS:string[];
+export const SOUND_KEYS:string[];
+export const SOUND_MODES:{value:string;label:string}[];
+export function readCategory(call:Call,socket:any,category:string,keys:string[]):Promise<Settings>;
+export function writeCategory(call:Call,socket:any,category:string,settings:Settings):Promise<void>;
+export function describePicture(settings:Settings):Record<string,any>;
+export function presetSettings(preset:string,current:Settings):Settings|null;
+export function luminanceSettings(value:unknown,current:Settings):Settings|null;
+export function modeValue(id:string,current:unknown):string|null;

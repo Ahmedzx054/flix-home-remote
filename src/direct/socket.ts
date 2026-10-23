@@ -19,6 +19,7 @@ export class TvSocket {
   }
   async write(data: string) { if (!this.active) throw new Error('التلفزيون غير متصل.'); await Lan.write({ id: this.id, data }); }
   send(data: unknown) { void this.write(JSON.stringify(data)).catch(e=>this.fail(e)); }
-  async request(uri: string, payload?: unknown): Promise<any> { const id=String(++this.sequence); const response=this.wait(m=>m.id===id); void response.catch(()=>{}); try { await this.write(JSON.stringify({ id, type:'request', uri, payload })); return (await response).payload; } catch(e) { this.fail(e); throw e; } }
+  async request(uri: string, payload?: unknown): Promise<any> { const id=String(++this.sequence); const response=this.wait(m=>m.id===id); void response.catch(()=>{}); try { await this.write(JSON.stringify({ id, type:'request', uri, payload })); } catch(e) { this.fail(e); throw e; } return (await response).payload; }
+  async rpc(method:string,params:unknown={},timeout=15000):Promise<any>{const id=++this.sequence;const response=this.wait(m=>m.id===id,timeout);void response.catch(()=>{});await this.write(JSON.stringify({id,method,params}));const answer=await response;if(answer.error)throw Error(String(answer.error.message||'رفض التلفزيون الطلب'));return answer.result;}
   close() { this.fail(new Error('أُغلق اتصال التلفزيون.')); }
 }

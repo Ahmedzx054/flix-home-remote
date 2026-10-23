@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>يحوّل زر صوتي كلامك إلى أمر ترسله من الهاتف إلى التلفزيون.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>يستخدم الميكروفون عند ضغط زر صوتي للإملاء والتحكم بالتلفزيون.</string>
     <key>NSLocalNetworkUsageDescription</key>
     <string>يكتشف ريموت البيت تلفزيوناتك ويتصل بها مباشرة من iPhone على شبكة Wi-Fi للتحكم ونقل التطبيقات التي تختارها.</string>
     <key>NSBonjourServices</key>

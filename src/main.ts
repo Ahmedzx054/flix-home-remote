@@ -1,7 +1,8 @@
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { platformNames, type Device, type Capabilities, type TvApp, type Setting, type PackageEntry, type InstallReceipt, type TvActivity, type Command } from './model.ts';
-import { directApi, initDirect, forgetDirect } from './direct/engine.ts';
+import { directApi, initDirect, forgetDirect, discoveryDiagnostics } from './direct/engine.ts';
+import { mountOriginalRemote } from './remote-page/mount.ts';
 import './style.css';
 import * as support from './support.ts';
 import { VERSION, BUILD_ID } from './build-info.ts';
@@ -13,12 +14,14 @@ let apps: TvApp[] = [], settings: Setting[] = [], packages: PackageEntry[] = [],
 let appError = '', settingsError = '', busy = false, scanning = false, reconnecting = false, detailSequence = 0;
 const details = new Map<string, { checkedAt: number; status: string; error: string; apps: TvApp[]; settings: Setting[]; activity?: TvActivity }>();
 let supportPolling = false, lastHeartbeat = 0, lastInspection = 0;
+let statusMessage = '', statusError = false;
+let originalRemote: ReturnType<typeof mountOriginalRemote> | undefined;
 const icons = new Map<string, string>();
 const escape = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 const television = () => devices.find(d => d.id === selected);
 const button = (action: string, text: string, extra = '') => `<button type="button" data-action="${action}" ${extra}>${text}</button>`;
 const tvPath = (id = selected) => '/api/devices/' + encodeURIComponent(id);
-function snapshot() { return { directConnected: online, connectionMode: 'phone-direct', deviceCount: devices.length, selectedDeviceId: selected, apps, settings, devices: devices.map(d => ({ ...d, ...details.get(d.id), appCount: details.get(d.id)?.apps.length || 0 })), packages, receipts }; }
+function snapshot() { return { directConnected: online, connectionMode: 'phone-direct', discovery: discoveryDiagnostics, deviceCount: devices.length, selectedDeviceId: selected, apps, settings, devices: devices.map(d => ({ ...d, ...details.get(d.id), appCount: details.get(d.id)?.apps.length || 0 })), packages, receipts }; }
 function supportPanel() {
   const grant = support.control && support.control.expiresAt > Date.now() ? support.control : undefined;
   return `<section class="panel support-panel"><div class="section-heading"><h2>الدعم عن بُعد</h2>${button(support.account ? 'logout' : 'login', support.account ? 'خروج' : 'دخول FLIX', 'class="quiet"')}</div>
@@ -46,7 +49,7 @@ const api = async <T>(route: string, method = 'GET', data?: unknown, timeout?: n
   try { if (!online) throw new Error('افتح التطبيق المثبت واسمح له بالشبكة المحلية.'); const reply = await directApi<T>(route, method, data); if (!route.endsWith('/icon')) support.record(stage, 'ok', method, selected); return reply; }
   catch (error) { support.record(stage, 'failed', error instanceof Error ? error.message : 'network error', selected); throw error; }
 };
-function status(message: string, error = false) { const toast = document.querySelector<HTMLElement>('#status')!; toast.textContent = message; toast.dataset.error = String(error); }
+function status(message: string, error = false) { statusMessage=message;statusError=error;const toast = document.querySelector<HTMLElement>('#status'); if(toast){toast.textContent = message; toast.dataset.error = String(error);} }
 function disable(disabled: boolean) {
   const d = television();
   root.querySelectorAll<HTMLButtonElement>('[data-command], [data-launch], [data-install]').forEach(b => {
@@ -56,10 +59,10 @@ function disable(disabled: boolean) {
 }
 function render() {
   const d = television();
-  root.innerHTML = `<header><a class="wordmark" href="#" aria-label="ريموت البيت"><span class="logo" aria-hidden="true">⌁</span><span>ريموت <b>البيت</b></span></a>${button('connection', `<span class="dot ${online ? 'connected' : ''}"></span>${online ? 'اتصال مباشر' : 'نسخة الهاتف'}`, 'class="connection"')}<button class="quiet" data-action="support">الحساب والمساعدة</button></header>
+  root.innerHTML = `${originalRemote?button('original-remote','↩ العودة لصفحة الريموت','class="primary original-back"'):''}<header><a class="wordmark" href="#" aria-label="ريموت البيت"><span class="logo" aria-hidden="true">⌁</span><span>ريموت <b>FLIX</b></span></a>${button('connection', `<span class="dot ${online ? 'connected' : ''}"></span>${online ? 'اتصال مباشر' : 'نسخة الهاتف'}`, 'class="connection"')}<button class="quiet" data-action="support">الحساب والمساعدة</button></header>
     <main><div class="eyebrow">كل شاشات البيت · في مكان واحد</div><div class="title-row"><h1>${d ? escape(d.name) : 'اختر تلفزيونك'}</h1>${button('scan', scanning ? 'يبحث…' : '↻ بحث', `class="quiet" ${!online || scanning ? 'disabled' : ''}`)}</div>
     <p class="subtitle">${d ? escape(platformNames[d.platform]) : 'اتصل بواي فاي البيت؛ هاتفك يتصل بالتلفزيون مباشرة.'}</p>
-    <div id="status" class="status" role="status" aria-live="polite">${online ? 'اتصال مباشر من الهاتف · اختر الشاشة أو ابحث في الشبكة.' : 'معاينة الواجهة. ثبّت نسخة Android أو iPhone للاتصال المباشر.'}</div>
+    <div id="status" class="status" data-error="${statusError}" role="status" aria-live="polite">${escape(statusMessage || (online ? 'اتصال مباشر من الهاتف · اختر الشاشة أو ابحث في الشبكة.' : 'معاينة الواجهة. ثبّت نسخة Android أو iPhone للاتصال المباشر.'))}</div>
     ${online ? `<div class="devices" aria-label="تلفزيونات البيت">${devices.map(x => `<button class="device ${x.id === selected ? 'selected' : ''}" data-device="${escape(x.id)}"><span aria-hidden="true">▣</span><span>${escape(x.name)}<small>${escape(platformNames[x.platform])} · ${x.paired ? 'مقترن' : 'يحتاج اقتران'}</small></span></button>`).join('')}${button('manual', '+ إضافة', 'class="device add"')}</div>` : `<section class="welcome"><div class="welcome-tv" aria-hidden="true">▣</div><h2>هاتفك، ريموت لكل شاشة متوافقة</h2><p>تحكم وافتح تطبيقاتك، واعرف ما يستطيع كل تلفزيون تنفيذه.</p>${button('connection', 'نسخ الهاتف والاتصال', 'class="primary"')}<p class="fine">لا تحتاج كمبيوترًا وسيطًا. البحث والتحكم ونقل الحزم تتم من الهاتف مباشرة.</p></section>`}
     ${tab === 'support' && (!online || !d) ? supportPanel() : ''}${online && d ? `<div class="target-info"><span>${d.paired ? '◉ مقترن' : '○ غير مقترن'} <bdi>${escape(d.host)}</bdi></span>${button('pair', d.paired ? 'إعادة الاقتران' : 'اقتران بالتلفزيون', 'class="text-button"')}</div><nav class="tabs" aria-label="أقسام الريموت">${(['remote', 'apps', 'settings', 'library', 'support'] as Tab[]).map((t, i) => `<button data-tab="${t}" class="${t === tab ? 'active' : ''}" aria-current="${t === tab ? 'page' : 'false'}">${['الريموت', 'التطبيقات', 'الإعدادات', 'تطبيقاتي', 'المساعدة'][i]}</button>`).join('')}</nav>${content(d)}` : online && tab !== 'support' ? `<section class="panel"><h2>لنبحث عن شاشاتك</h2><p>شغّل التلفزيون وتأكد أن الهاتف والتلفزيون على شبكة واحدة. شبكة الضيوف قد تمنع اكتشاف الأجهزة.</p>${button('scan', 'بحث عن تلفزيونات', 'class="primary"')} ${button('manual', 'إضافة بالعنوان', 'class="quiet"')}</section>` : ''}
     </main><footer>ريموت البيت ${escape(VERSION)} <span title="${escape(BUILD_ID)}">iPhone · Android</span></footer><dialog id="dialog"></dialog>`;
@@ -155,6 +158,7 @@ root.addEventListener('click', event => {
   const target = (event.target as Element).closest<HTMLElement>('button, a'); if (!target) return;
   if (target instanceof HTMLButtonElement && target.disabled) return;
   const action = target.dataset.action;
+  if (action === 'original-remote') { closeDialog();originalRemote?.show(television()?.host);return; }
   if (action === 'close') { closeDialog(); return; }
   if (action === 'support') { tab = 'support'; render(); return; }
   if (action === 'login') { showLogin(); return; }
@@ -296,8 +300,15 @@ render();
 await support.initSupport();
 render();
 await reconnect();
+if (!new URLSearchParams(location.search).has('utility')) {
+  originalRemote=mountOriginalRemote({api,selected:()=>selected,select:id=>{selected=id;},record:(stage,ok,message,id)=>support.record(stage,ok?'ok':'failed',message,id),open:(action,host)=>{
+    void run(async()=>{if(online)await refreshDevices();if(host){const d=devices.find(d=>d.host===host);if(d)selected=d.id;}
+    document.body.classList.remove('remote-original');tab=action==='support'?'support':action==='library'?'library':action==='settings'?'settings':'remote';await loadDetails();render();
+    if(action==='pair')showPair();else if(action==='manual'){root.querySelector<HTMLButtonElement>('[data-action="manual"]')?.click();const input=root.querySelector<HTMLInputElement>('input[name="host"]');if(input&&host)input.value=host;}});
+  }});
+}
 if (Capacitor.isNativePlatform()) {
-  closeDialog(); void run(scan);
+  closeDialog(); if(!originalRemote)void run(scan);
   void App.addListener('appStateChange', ({ isActive }) => { if (isActive) void reconnect().then(() => run(scan)); else { support.revokeControl(); void support.stopSharing(); } });
 }
 window.addEventListener('online', () => { void reconnect(); });

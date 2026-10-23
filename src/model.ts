@@ -1,5 +1,5 @@
 export type Platform = 'webos' | 'tizen' | 'android' | 'roku' | 'unknown';
-export type Command = 'up' | 'down' | 'left' | 'right' | 'ok' | 'back' | 'home' | 'volumeUp' | 'volumeDown' | 'mute' | 'playPause' | 'powerOff' | 'settings';
+export type Command = 'up' | 'down' | 'left' | 'right' | 'ok' | 'back' | 'home' | 'volumeUp' | 'volumeDown' | 'mute' | 'playPause' | 'powerOff' | 'settings' | 'channelUp' | 'channelDown' | 'rewind' | 'fastForward' | 'info' | 'exit' | 'play' | 'pause';
 export interface Device {
   id: string; name: string; host: string; platform: Platform; model?: string;
   port?: number; pairPort?: number; developerTarget?: string; developerPort?: number; developerReady?: boolean; paired: boolean; seenAt: number;

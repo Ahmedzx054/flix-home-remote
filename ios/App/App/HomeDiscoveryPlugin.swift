@@ -5,12 +5,63 @@ import Security
 import Network
 import ADBCore
 import CryptoKit
+import Speech
+import AVFoundation
 
 @objc(HomeDiscoveryPlugin)
 public class HomeDiscoveryPlugin: CAPPlugin, CAPBridgedPlugin {
     public let identifier = "HomeDiscoveryPlugin"
     public let jsName = "HomeDiscovery"
-    public let pluginMethods: [CAPPluginMethod] = ["saveSession", "readSession", "clearSession"].map { CAPPluginMethod(name: $0, returnType: CAPPluginReturnPromise) }
+    public let pluginMethods: [CAPPluginMethod] = ["saveSession", "readSession", "clearSession", "recognizeSpeech"].map { CAPPluginMethod(name: $0, returnType: CAPPluginReturnPromise) }
+    private var speechEngine: AVAudioEngine?
+    private var speechTask: SFSpeechRecognitionTask?
+    private var speechCall: CAPPluginCall?
+    private var speechText = ""
+    private var speechTapInstalled = false
+    @objc public func recognizeSpeech(_ call: CAPPluginCall) {
+        SFSpeechRecognizer.requestAuthorization { status in
+            guard status == .authorized else { call.reject("اسمح بالتعرف على الكلام من إعدادات الآيفون"); return }
+            AVAudioSession.sharedInstance().requestRecordPermission { granted in
+                guard granted else { call.reject("اسمح بالميكروفون من إعدادات الآيفون"); return }
+                DispatchQueue.main.async { self.startSpeech(call) }
+            }
+        }
+    }
+    private func finishSpeech(_ error: String? = nil) {
+        guard let call = speechCall else { return }; speechCall = nil
+        speechEngine?.stop()
+        if speechTapInstalled { speechEngine?.inputNode.removeTap(onBus: 0); speechTapInstalled = false }
+        speechEngine = nil
+        speechTask?.cancel(); speechTask = nil
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        if let error = error, speechText.isEmpty { call.reject(error) } else { call.resolve(["text": speechText]) }
+    }
+    private func startSpeech(_ call: CAPPluginCall) {
+        guard speechCall == nil else { call.reject("الاستماع جارٍ"); return }
+        guard let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "ar-SA")), recognizer.isAvailable else { call.reject("الإملاء الصوتي غير متاح الآن؛ اكتب الأمر"); return }
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.record, mode: .measurement, options: .duckOthers)
+            try AVAudioSession.sharedInstance().setActive(true)
+            let engine = AVAudioEngine(), request = SFSpeechAudioBufferRecognitionRequest()
+            request.shouldReportPartialResults = true
+            speechCall = call; speechText = ""; speechEngine = engine
+            let input = engine.inputNode, format = input.outputFormat(forBus: 0)
+            guard format.sampleRate > 0, format.channelCount > 0 else { finishSpeech("الميكروفون غير متاح"); return }
+            input.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in request.append(buffer) }
+            speechTapInstalled = true
+            engine.prepare(); try engine.start()
+            speechTask = recognizer.recognitionTask(with: request) { result, error in
+                DispatchQueue.main.async {
+                    if let result = result { self.speechText = result.bestTranscription.formattedString }
+                    if result?.isFinal == true || error != nil { self.finishSpeech(error == nil ? nil : "تعذر الاستماع؛ اكتب الأمر") }
+                }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 12) { if self.speechCall === call { self.finishSpeech() } }
+        } catch {
+            if speechCall != nil { finishSpeech("تعذر تشغيل الميكروفون") }
+            else { try? AVAudioSession.sharedInstance().setActive(false); call.reject("تعذر تشغيل الميكروفون") }
+        }
+    }
     private func keychainQuery(_ call: CAPPluginCall) -> [String: Any] { [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: "com.flix.homeremote", kSecAttrAccount as String: call.getString("key") == "tv-secrets" ? "tv-secrets" : "account-session"] }
     @objc public func saveSession(_ call: CAPPluginCall) {
         guard let value = call.getString("value"), value.utf8.count <= 16384 else { call.reject("جلسة غير صالحة"); return }
@@ -75,6 +126,7 @@ public class DirectLanPlugin: CAPPlugin, CAPBridgedPlugin, NetServiceBrowserDele
     private let io = DispatchQueue(label: "flix.direct.lan", attributes: .concurrent)
     private var browsers: [NetServiceBrowser] = []; private var services: [NetService] = []
     private var discovered: [[String: Any]] = []; private var discoveryCall: CAPPluginCall?
+    private var discoveryDiagnostics: [String: Any] = [:]
     private func channel(_ id: String) -> DirectChannel? { channelLock.lock(); defer { channelLock.unlock() }; return channels[id] }
     private func url(_ value: String, schemes: [String]) -> URL? { guard let u = URL(string: value), let h = u.host, directLocal(h), u.user == nil, u.password == nil, u.fragment == nil, schemes.contains(u.scheme ?? "") else { return nil }; return u }
     @objc public func open(_ call: CAPPluginCall) {
@@ -125,13 +177,63 @@ public class DirectLanPlugin: CAPPlugin, CAPBridgedPlugin, NetServiceBrowserDele
     }
     @objc public func discover(_ call: CAPPluginCall) {
         DispatchQueue.main.async {
-            guard self.discoveryCall == nil else { call.reject("البحث جارٍ بالفعل"); return }; self.discoveryCall = call; self.discovered = []; self.services = []
+            guard self.discoveryCall == nil else { call.reject("البحث جارٍ بالفعل"); return }; self.discoveryCall = call; self.discovered = []; self.services = []; self.discoveryDiagnostics = [:]
             for type in ["_androidtvremote2._tcp.", "_googlecast._tcp.", "_adb._tcp.", "_adb-tls-connect._tcp."] { let browser = NetServiceBrowser(); browser.delegate = self; self.browsers.append(browser); browser.searchForServices(ofType: type, inDomain: "local.") }
             self.io.async { let values = self.ssdp(); DispatchQueue.main.async { if self.discoveryCall === call { self.discovered.append(contentsOf: values) } } }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 4.5) { guard self.discoveryCall === call else { return }; self.browsers.forEach { $0.stop() }; self.browsers = []; self.services.forEach { $0.stop() }; self.services = []; self.discoveryCall = nil; call.resolve(["devices": self.discovered]) }
+            // Free Apple accounts cannot sign the restricted multicast entitlement. Read-only
+            // unicast service probes keep discovery usable without that entitlement or a relay.
+            self.io.async { let fallback = self.unicastDescriptions(); DispatchQueue.main.async { if self.discoveryCall === call { self.discovered.append(contentsOf: fallback.devices); self.discoveryDiagnostics["wifiAvailable"] = fallback.wifi; self.discoveryDiagnostics["fallbackCandidates"] = fallback.devices.count } } }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 9.5) { guard self.discoveryCall === call else { return }; self.browsers.forEach { $0.stop() }; self.browsers = []; self.services.forEach { $0.stop() }; self.services = []; self.discoveryCall = nil; call.resolve(["devices": self.discovered, "diagnostics": self.discoveryDiagnostics]) }
         }
     }
     public func netServiceBrowser(_ browser: NetServiceBrowser, didFind service: NetService, moreComing: Bool) { guard browsers.contains(browser), discoveryCall != nil else { return }; services.append(service); service.delegate = self; service.resolve(withTimeout: 3) }
+    public func netServiceBrowser(_ browser: NetServiceBrowser, didNotSearch errorDict: [String: NSNumber]) { if discoveryCall != nil { discoveryDiagnostics["warnings"] = ["Bonjour unavailable: check Local Network permission in iPhone Settings"] } }
+    private func unicastDescriptions() -> (devices: [[String: Any]], wifi: Bool) {
+        let monitor = NWPathMonitor(requiredInterfaceType: .wifi), pathReady = DispatchSemaphore(value: 0)
+        monitor.pathUpdateHandler = { _ in pathReady.signal() }; monitor.start(queue: io)
+        _ = pathReady.wait(timeout: .now() + 1); defer { monitor.cancel() }
+        let path = monitor.currentPath
+        let names = Set(path.availableInterfaces.filter { $0.type == .wifi }.map { $0.name })
+        guard path.status == .satisfied, !names.isEmpty else { return ([], false) }
+        var interfaces: UnsafeMutablePointer<ifaddrs>?
+        guard getifaddrs(&interfaces) == 0 else { return ([], true) }; defer { freeifaddrs(interfaces) }
+        var hosts = Set<String>(); var cursor = interfaces
+        while let item = cursor {
+            defer { cursor = item.pointee.ifa_next }
+            guard names.contains(String(cString: item.pointee.ifa_name)), let address = item.pointee.ifa_addr, address.pointee.sa_family == UInt8(AF_INET), let mask = item.pointee.ifa_netmask else { continue }
+            let raw = UnsafeRawPointer(address).assumingMemoryBound(to: sockaddr_in.self).pointee.sin_addr.s_addr
+            let rawMask = UnsafeRawPointer(mask).assumingMemoryBound(to: sockaddr_in.self).pointee.sin_addr.s_addr
+            let ip = UInt32(bigEndian: raw), netmask = UInt32(bigEndian: rawMask)
+            // Limit broad networks to the phone's /24 window; never scan VPN, cellular or public ranges.
+            let boundedMask = netmask | 0xffffff00, network = ip & boundedMask, broadcast = network | ~boundedMask
+            guard broadcast > network + 1 else { continue }
+            for value in (network + 1)..<broadcast where value != ip {
+                var v = in_addr(s_addr: value.bigEndian); var buffer = [CChar](repeating: 0, count: Int(INET_ADDRSTRLEN))
+                if inet_ntop(AF_INET, &v, &buffer, socklen_t(buffer.count)) != nil { let host = String(cString: buffer); if directLocal(host) { hosts.insert(host) } }
+            }
+        }
+        let endpoints: [(UInt16, String)] = [(1387, "/"), (8001, "/api/v2/"), (8060, "/query/device-info"), (8008, "/ssdp/device-desc.xml")]
+        let slots = DispatchSemaphore(value: 64), group = DispatchGroup(), lock = NSLock()
+        var result: [[String: Any]] = []; let deadline = DispatchTime.now() + 7
+        for host in hosts.sorted().prefix(254) {
+            for (port, route) in endpoints {
+                if slots.wait(timeout: deadline) == .timedOut { break }
+                if DispatchTime.now() >= deadline { slots.signal(); break }
+                group.enter()
+                let connection = NWConnection(host: NWEndpoint.Host(host), port: NWEndpoint.Port(rawValue: port)!, using: .tcp)
+                let stateLock = NSLock(); var finished = false
+                let finish: (Bool) -> Void = { ready in
+                    stateLock.lock(); if finished { stateLock.unlock(); return }; finished = true; stateLock.unlock()
+                    if ready { lock.lock(); result.append(["host": host, "location": "http://\(host):\(port)\(route)"]); lock.unlock() }
+                    connection.cancel(); slots.signal(); group.leave()
+                }
+                connection.stateUpdateHandler = { state in switch state { case .ready: finish(true); case .failed, .cancelled: finish(false); default: break } }
+                connection.start(queue: io); io.asyncAfter(deadline: .now() + 0.35) { finish(false) }
+            }
+        }
+        _ = group.wait(timeout: deadline + 0.5); lock.lock(); let snapshot = result; lock.unlock()
+        return (snapshot, true)
+    }
     public func netServiceDidResolveAddress(_ service: NetService) {
         guard discoveryCall != nil, services.contains(service) else { return }
         for data in service.addresses ?? [] { data.withUnsafeBytes { bytes in guard let p = bytes.baseAddress?.assumingMemoryBound(to: sockaddr.self), p.pointee.sa_family == sa_family_t(AF_INET) else { return }; var name = [CChar](repeating: 0, count: Int(NI_MAXHOST)); guard getnameinfo(p, socklen_t(data.count), &name, socklen_t(name.count), nil, 0, NI_NUMERICHOST) == 0 else { return }; let host = String(cString: name); if directLocal(host) { discovered.append(["host": host, "name": service.name, "platform": "android", "service": service.type, "port": (service.type == "_adb._tcp." || service.type == "_adb-tls-connect._tcp.") ? service.port : 5555]) } } }

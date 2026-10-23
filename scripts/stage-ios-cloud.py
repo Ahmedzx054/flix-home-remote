@@ -10,7 +10,7 @@ SINGLE = ['package.json', 'package-lock.json', 'tsconfig.json', 'vite.config.ts'
           '.gitignore', 'README.md', 'IOS_CLOUD.md', 'android/build.gradle', 'android/app/build.gradle',
           'public/THIRD_PARTY_NOTICES.txt', 'public/manifest.webmanifest', 'public/icon.svg',
           'ios/debug.xcconfig', 'scripts/build-ios.sh', 'scripts/build-ssh.mjs',
-          'scripts/build-identity.mjs', 'scripts/package-ios-unsigned.py', 'scripts/stage-ios-cloud.py',
+          'scripts/build-identity.mjs', 'scripts/sync-remote-page.mjs', 'scripts/package-ios-unsigned.py', 'scripts/stage-ios-cloud.py',
           'tests/test_ios_distribution.py']
 DENIED_PARTS = {'node_modules', 'build', 'Pods', '.build', 'public', '.data', '.vercel', '__pycache__',
                 '.git', '_CodeSignature'}

@@ -1,7 +1,8 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
-export interface Discovery { host: string; name?: string; platform?: string; port?: number; service?: string; ssdp?: string }
+export interface Discovery { host: string; name?: string; platform?: string; port?: number; service?: string; ssdp?: string; location?: string }
+export interface DiscoveryDiagnostics { wifiAvailable?: boolean; fallbackCandidates?: number; warnings?: string[] }
 export interface LanPlugin {
-  discover(): Promise<{ devices: Discovery[] }>;
+  discover(): Promise<{ devices: Discovery[]; diagnostics?: DiscoveryDiagnostics }>;
   open(input: { id: string; kind: 'tcp' | 'ws'; host?: string; port?: number; url?: string }): Promise<void>;
   read(input: { id: string }): Promise<{ data?: string; closed: boolean }>;
   write(input: { id: string; data: string }): Promise<void>;
