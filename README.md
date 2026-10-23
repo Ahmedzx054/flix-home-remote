@@ -1,11 +1,13 @@
-# ريموت البيت — FLIX — 0.4.0
+# صفحة ريموت FLIX الأصلية — iPhone وAndroid — 0.5.1
+
+الصفحة الأصلية `local_apps/flix-s/tools/tv-remote.html` هي واجهة التطبيق الافتراضية. أدوات الاقتران والحزم وحساب FLIX تفتح من داخلها وتعود لنفس الشاشة المختارة. مطابقة كل أداة وحدود التلفزيونات والأدلة في [ORIGINAL_REMOTE_PARITY_AR.md](ORIGINAL_REMOTE_PARITY_AR.md).
 
 الهاتف يتصل بالتلفزيون مباشرة على Wi-Fi، دون كمبيوتر أو Node أو adb server في البيت. الحساب وقناة الدعم يستخدمان خدمة FLIX عبر HTTPS. التحكم يحتاج التطبيق الأصلي؛ المتصفح يعرض الواجهة فقط.
 
 ## التسليم والاستخدام
 
 - Android: `releases/home-remote-android-debug.apk`، نسخة تطوير موقعة وليست إصدار متجر؛ الهوية والبصمة في `evidence/android.json`.
-- iPhone: ‏`releases/HomeRemote-unsigned.ipa`، نسخة جهاز 0.4.0/build5 جُمّعت فعليا على Xcode 27.1 وSwift 6.4. تحتاج توقيعا بحساب Apple العادي من Windows عبر AltStore ثم تجربة الهاتف؛ لا يلزم امتلاك Mac. هوية البناء وبصمته وخطوات التثبيت في `IOS_CLOUD.md`.
+- iPhone: ‏`releases/public-ios-build-3/HomeRemote-unsigned.ipa`، نسخة جهاز0.5.1/build7 جُمّعت فعليا على Xcode27.1. تحتاج توقيعا بحساب Apple العادي من Windows عبر iLoader أو AltStore ثم تجربة الهاتف؛ لا يلزم امتلاك Mac. فحص ARM64/هوية/مصدر الواجهة نجح، والتوقيع/التثبيت وقبول الهاتف والتلفزيون لهذا الإصدار لم ينفذ بعد.
 - مدخل FLIX: `/remote` ← `/home-remote.html` وتنزيل `/home-remote/android.apk`؛ منشور في FLIX Admin. التحقق وحدوده في `VERIFICATION.md`.
 
 ثبّت التطبيق واسمح بالشبكة المحلية. صل الهاتف والتلفزيون بالشبكة نفسها؛ شبكات الضيوف وعزل العملاء قد تمنع الاتصال. ابحث أو أضف IPv4 المحلي ونظام الشاشة، اخترها ثم اقترن ووافق عليها. البحث يعمل عند الفتح والطلب والاستئناف؛ لا يعد باكتشاف دائم والتطبيق مغلق.
@@ -97,9 +99,9 @@ node scripts/stage-release.mjs
 
 `verify-native` يفحص توقيع APK وهويته وDEX وWASM، وXML ومراجع iOS فقط. `stage-release` ينسخ APK وrelease.json إلى `../flix-s/public/home-remote/` محليا دون نشر. APK مستثنى من Git ويعاد تجهيزه قبل النشر المعتمد. ينشر flix-admin للحساب والدعم والتنزيل ومدخل /remote؛ لا يلزم نشر FLIX S لتوزيع الهاتف. مرشح الإنتاج يستعيد مصدر Admin الحي ويتحقق من بصماته قبل إضافة الدعم حفاظا على إصلاحات الحسابات. تفاصيل النشر الحالي في PUBLIC_RELEASE.md.
 
-دون Mac محلي: نفذ `python scripts/stage-ios-cloud.py` لتجهيز مصدر مستقل خاص ثم اتبع `IOS_CLOUD.md`. Workflow GitHub يبني جهاز ARM64 غير موقع على `xcode-27` للتوقيع عبر Windows بحساب Apple عادي. SSDP يحتاج multicast entitlement معتمدا لا يدخل هذا المسار؛ Bonjour للخدمات المعلنة أو إدخال IPv4 بدائل تستلزم إذن الشبكة المحلية. لا يمثل تجهيز المصدر أو `cap sync ios` نجاح تجميع Swift.
+دون Mac محلي: نفذ `python scripts/stage-ios-cloud.py` لتجهيز مصدر مستقل دون بيانات المستخدمين ثم اتبع `IOS_CLOUD.md`. Workflow GitHub يبني جهاز ARM64 غير موقع على `xcode-27` للتوقيع عبر Windows بحساب Apple عادي. عند تعذر multicast يستخدم iOS Bonjour ووصف HTTP محدودا بالشبكة الفعلية، مع إضافة IPv4 يدوية. يلزم إذن الشبكة المحلية. لا يمثل تجهيز المصدر أو `cap sync ios` نجاح تجميع Swift.
 
-على Mac محلي أو سحابي يمكن تشغيل `bash scripts/build-ios.sh unsigned` لبناء IPA يحتاج توقيع المستخدم، أو `simulator` للتحقق من التجميع فقط، أو `FLIX_APPLE_TEAM=TEAM_ID bash scripts/build-ios.sh archive` بعد تجهيز التوقيع. لتصدير الأرشيف الموقع اضبط `FLIX_IOS_EXPORT_OPTIONS` على ملف ExportOptions.plist الخاص بفريقك. السكربت يفحص Swift 6.4 ولا يرفع إلى المتجر. بناء الجهاز السحابي #39952010968 نجح؛ التوقيع والتثبيت وقبول iPhone/TV لم تنفذ بعد.
+على Mac محلي أو سحابي يمكن تشغيل `bash scripts/build-ios.sh unsigned` لبناء IPA يحتاج توقيع المستخدم، أو `simulator` للتحقق من التجميع فقط، أو `FLIX_APPLE_TEAM=TEAM_ID bash scripts/build-ios.sh archive` بعد تجهيز التوقيع. لتصدير الأرشيف الموقع اضبط `FLIX_IOS_EXPORT_OPTIONS` على ملف ExportOptions.plist الخاص بفريقك. السكربت يفحص Swift6.4 ولا يرفع إلى المتجر. [بناء0.5.1/build7](https://github.com/Ahmedzx054/flix-home-remote/actions/runs/39990504058) نجح؛ قبول هذا الإصدار على iPhone/TV ما زال مطلوبا.
 
 القبول على هاتف وشاشات حقيقية مستقل عن نجاح البناء واختبارات البروتوكولات الاصطناعية. راجع `VERIFICATION.md` و`PUBLIC_RELEASE.md` لهوية النسخة والقيود الحالية.
 
