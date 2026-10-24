@@ -35,7 +35,29 @@ try{
  checks.push('bundled original page renders while cloud manifest is pending');finishCloud();
  await expect(frame.getByRole('button',{name:'تثبيت التطبيقات',exact:true})).toBeVisible();
  assert.deepEqual(errors,[]);
+ // A fresh install has no account. Its automatic discovery must fail closed
+ // without opening a dialog over a page whose layout assertions still pass.
+ const fresh=await browser.newPage({viewport:{width:390,height:844}}),freshNative=nativeFixture();
+ inspected=fresh;
+ await fresh.exposeFunction('fixtureNative',(plugin:string,method:string,args:any)=>freshNative.invoke(plugin,method,args));
+ await fresh.addInitScript('globalThis.__name=(value)=>value');await fresh.addInitScript(installNativeBoundary);
+ await fresh.route('https://**/*',r=>r.fulfill({status:503,body:'{}',contentType:'application/json'}));
+ await fresh.goto('http://127.0.0.1:'+(server.address() as any).port);
+ const freshFrame=fresh.frameLocator('#original-remote');
+ await expect(fresh.locator('#original-remote')).toHaveAttribute('data-flix-painted','true');
+ const denied=await fresh.evaluate(async()=>await (await window.flixRemotePageRequest('/api/discover',{method:'POST',body:'{}'})).json());
+ assert.equal(denied.ok,false);assert.match(denied.message,/FLIX|دخول|حساب/);
+ assert.equal(await fresh.locator('dialog[open]').count(),0);
+ assert.equal(freshNative.calls.filter(c=>c.plugin==='DirectLan'||c.plugin==='DirectAdb').length,0);
+ await expect(freshFrame.locator('#tvPick')).toBeVisible();
+ assert.equal(await fresh.locator('#original-remote').evaluate(f=>{const r=f.getBoundingClientRect();return document.elementFromPoint(r.x+r.width/2,r.y+30)===f;}),true);
+ checks.push('fresh install remains visibly unobscured while unauthenticated discovery is denied before LAN access');
+ await freshFrame.getByRole('button',{name:'حساب FLIX',exact:true}).click();
+ await expect(freshFrame.getByRole('button',{name:'دخول FLIX',exact:true})).toBeVisible();
+ await expect(freshFrame.locator('dialog[open]')).toBeVisible();
+ checks.push('explicit account action still opens the original FLIX account dialog');
+ await fresh.close();
  mkdirSync('evidence',{recursive:true});await page.screenshot({path:'evidence/startup-page.png'});
  const result={checks,passed:checks.length,cloudPendingRender:true,pageErrors:errors,physicalPhone:false,tvConnections:0};
  writeFileSync('evidence/startup-page.json',JSON.stringify(result,null,2));console.log(JSON.stringify(result));
-}finally{await browser.close();await new Promise<void>(r=>server.close(()=>r()));}
+}catch(error){if(inspected){console.error((await inspected.locator('body').innerText()).slice(0,4000));await inspected.screenshot({path:'evidence/startup-page-failure.png'});}throw error;}finally{await browser.close();await new Promise<void>(r=>server.close(()=>r()));}

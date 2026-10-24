@@ -73,7 +73,7 @@ private final class DayRemoteView: UIControl {
             }
             return
         }
-        let script = "(() => { const f = document.getElementById('original-remote'); const d = f?.contentDocument; const p = d?.getElementById('tvPick'); return !!(p && p.getBoundingClientRect().width > 100 && innerWidth > 200 && innerHeight > 200); })()"
+        let script = "(() => { const f = document.getElementById('original-remote'); const d = f?.contentDocument; const p = d?.getElementById('tvPick'); const r = f?.getBoundingClientRect(); return !!(p && p.getBoundingClientRect().width > 100 && innerWidth > 200 && innerHeight > 200 && f.dataset.flixPainted === 'true' && !document.querySelector('dialog[open]') && !d.querySelector('dialog[open]') && !document.body.classList.contains('native-sheet-open') && document.elementFromPoint(r.x+r.width/2,r.y+Math.min(30,r.height/2)) === f); })()"
         web.evaluateJavaScript(script) { [weak self] value, error in
             guard let self, self.window != nil, generation == self.probeGeneration else { return }
             self.pageReady = (value as? Bool == true) && self.bounds.width > 200 && self.bounds.height > 200
