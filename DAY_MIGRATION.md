@@ -2,6 +2,10 @@
 
 Status: source candidate, not a published or physically qualified mobile release.
 
+Public review: https://github.com/Ahmedzx054/flix-home-remote/pull/1 (draft).
+App Fair introduction submitted: https://github.com/orgs/appfair/discussions/7 .
+This is an introduction and architecture/privacy review request, not catalog acceptance.
+
 ## Shared interface and native bridge
 
 `Flix-Remote/` is a real Day 0.6.0 project generated with the official CLI. One custom

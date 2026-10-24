@@ -25,5 +25,7 @@ jobs:
       release-assets: false
       deploy-web: false
       update-day-deps: false
+      target-packages: |
+        ios-uikit: go
       target-setup: |
-        ios-uikit, android-mdc, web-dom: npm ci && npm run build
+        ios-uikit, android-mdc, web-dom: npm ci && npm run build && npm test

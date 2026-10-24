@@ -72,7 +72,7 @@ mod dom {
     use day_spec::{NodeId, Proposal, Size};
     fn make(b: &mut Dom, _: &RemoteProps, _: NodeId) -> DomHandle {
         let h = b.element("iframe");
-        b.set_attr(&h, "src", "assets/public/index.html");
+        b.set_attr(&h, "src", "assets/data/public/index.html");
         b.set_attr(&h, "title", &crate::res::str::remote_title().format());
         b.set_attr(&h, "style", "border:0;width:100%;height:100%;display:block");
         b.set_attr(&h, "allow", "microphone; clipboard-write");
