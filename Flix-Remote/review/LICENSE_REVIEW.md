@@ -39,7 +39,7 @@ repairs those two grants using exact upstream source: libadb-android 3.1.1 at
 `c849886ebc6d48e7b46d967e78a6bb65c90c3b74` (Apache-2.0 alternative to GPL),
 and ionfilesystem-android 1.1.1 at
 `ad4c23981b63fdf60627e23a94187076997fc82b` (MIT). Their complete source ZIPs,
-six actual license/copyright documents and hashes are bundled under
+the actual license/copyright documents and hashes are bundled under
 `public/licenses/native/`. This preserves upstream notices, including embedded
 BSD/MIT documents; it does not relabel every file Apache or prove reproduction. Zero Maven files have
 verified source-to-binary reproduction. `native/review-ios-uikit.json` supplies
@@ -74,3 +74,7 @@ Cargo/npm graph, and the resolved native graphs have been collected. **Release
 approval remains blocked** on native source/license completeness, Maven
 reproduction, LGPL/store compatibility and rights for submitted content.
 Neither SPDX metadata nor passing App Fair lint closes these obligations.
+
+## Additional native repair in the current candidate
+
+The supplement now includes the exact three SwiftPM wrapper/source repositories and all five locked Go modules: five Git source ZIPs, fourteen real license documents, and Go-verified module and go.mod content sums. Unknown Go modules/versions fail the collector rather than inheriting an assumed license. The pinned `capacitor-swift-pm` package is explicitly a binary wrapper: its two XCFramework checksums are recorded, and the separate Capacitor implementation source is identified as 8.5.3 commit `06e3e1984337f836a4c28b2afc92faa977dea315`. Its wrapper archive is not claimed to be that implementation. Reproduction of these binary frameworks, Maven artifacts and transitive notice completeness remain gates.

@@ -23,6 +23,15 @@ control stops sharing and removes the phone copy. It does not erase the server
 report. Retention tests reject expired, future and non-finite timestamps. These
 source changes need the new native build; they are not claims about the old IPA.
 
+The reviewed source privacy manifest now declares account/profile name, email,
+user/installation IDs, interaction/search data, support content and diagnostics,
+all linked to the account for app functionality. On-device audio is not uploaded
+by this client. `day-native-review.py` compares the actual IPA's main-app manifest
+to this source and fails packaging evidence collection on a mismatch. A fresh
+build must prove delivery; a source edit alone does not repair the old IPA.
+Apple format reference:
+https://developer.apple.com/documentation/technotes/tn3184-adding-data-collection-details-to-your-privacy-manifest .
+
 ## Findings blocking store qualification
 
 1. **Automatic account inventory.** `support.ts:accessGate` sends installation,

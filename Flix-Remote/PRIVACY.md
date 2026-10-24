@@ -48,5 +48,12 @@ blockers. Store data labels and required-reason API declarations must match the
 approved binary/services. Tracking=false in `PrivacyInfo.xcprivacy` alone does not
 prove that no data is collected.
 
+The candidate's main-app privacy manifest declares account/profile name, email,
+user and installation identifiers, product interaction, search history, support
+content, other user content and diagnostics as account-linked data used for app
+functionality. These declarations cover the reviewed client paths and are checked
+against the packed IPA. They do not certify processor retention or replace the
+store questionnaire and service review.
+
 Evidence: `review/PRIVACY_REVIEW.md` and `review/RELEASE_REVIEW.md`. This candidate
 disclosure does not claim the blocked production/privacy work has been completed.

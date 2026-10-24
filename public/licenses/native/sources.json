@@ -50,5 +50,76 @@
       }
     ],
     "binary_reproduction_verified": false
+  },
+  {
+    "name": "iadb-ios",
+    "version": "revision-22902f6231c4",
+    "repository": "https://github.com/h33h/iadb-ios",
+    "revision": "22902f6231c413f2d90accee68f0e59f1c9ea360",
+    "source_url": "https://codeload.github.com/h33h/iadb-ios/zip/22902f6231c413f2d90accee68f0e59f1c9ea360",
+    "source_file": "iadb-ios-revision-22902f6231c4-source.zip",
+    "sha256": "0ab4bdec4897bc725376787ce17c4ab542797e83aa7e6ff61063fbbe4acad500",
+    "licenses": "MIT",
+    "selected_alternative": "MIT",
+    "documents": [
+      {
+        "path": "LICENSE",
+        "sha256": "ea354f5e22831fec4af458899e74d449efdb227e3b67e62b1cee4be815c5a3be"
+      }
+    ],
+    "binary_reproduction_verified": false
+  },
+  {
+    "name": "ionfilesystem-ios",
+    "version": "2.0.1",
+    "repository": "https://github.com/ionic-team/ion-ios-filesystem",
+    "revision": "549c18ad9d9bb70d05df37cc3f6f7aa7f5d0ee52",
+    "source_url": "https://codeload.github.com/ionic-team/ion-ios-filesystem/zip/549c18ad9d9bb70d05df37cc3f6f7aa7f5d0ee52",
+    "source_file": "ionfilesystem-ios-2.0.1-source.zip",
+    "sha256": "75781ae1bd3f281763605d2fc074428a9acd87fa948aeaf08aefbc8b4ecdb3a8",
+    "licenses": "MIT",
+    "selected_alternative": "MIT",
+    "documents": [
+      {
+        "path": "LICENSE",
+        "sha256": "de884404585ed20280150b0768082b6004d3548aaa0d6e596d6bfa0538ab331d"
+      }
+    ],
+    "binary_reproduction_verified": false
+  },
+  {
+    "name": "capacitor-swift-pm",
+    "version": "8.5.3",
+    "repository": "https://github.com/ionic-team/capacitor-swift-pm",
+    "revision": "4c7f346d16196e21fbe23d4a7a6fc7af62af6742",
+    "source_url": "https://codeload.github.com/ionic-team/capacitor-swift-pm/zip/4c7f346d16196e21fbe23d4a7a6fc7af62af6742",
+    "source_file": "capacitor-swift-pm-8.5.3-source.zip",
+    "sha256": "3caa518da26248f4b75df8c25071192428d1c93f7b97f484873ce3d654c127e8",
+    "licenses": "MIT",
+    "selected_alternative": "MIT",
+    "documents": [
+      {
+        "path": "LICENSE.md",
+        "sha256": "48f126b6311bd8e86b56bb3d2c5105a7999e9c348c2ceca7e60e397e7b5f41de"
+      }
+    ],
+    "binary_reproduction_verified": false,
+    "source_kind": "SwiftPM binary-target wrapper; implementation source separately identified",
+    "implementation_source": {
+      "repository": "https://github.com/ionic-team/capacitor",
+      "tag": "8.5.3",
+      "revision": "06e3e1984337f836a4c28b2afc92faa977dea315",
+      "binary_reproduction_verified": false
+    },
+    "binary_targets": [
+      {
+        "name": "Capacitor",
+        "sha256": "9316f568444411d362dcb4d1946e7572d4aef5d690c122ff6f1cb8a44a920c9f"
+      },
+      {
+        "name": "Cordova",
+        "sha256": "bdcd8eab2d62a077efd76c3c8b9629e65ae7043c1462289a1e55de9be19bbf1f"
+      }
+    ]
   }
 ]

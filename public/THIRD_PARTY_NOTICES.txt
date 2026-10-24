@@ -1,6 +1,6 @@
 FLIX Home Remote / Day 0.6.0 candidate
 
-Go 1.25.x and golang.org/x/crypto v0.43.0: BSD, see licenses/Go.txt and licenses/x-crypto.txt.
+Go (actual compiler version recorded in native build evidence) and golang.org/x/crypto v0.43.0: BSD, see licenses/Go.txt and licenses/x-crypto.txt.
 golang.org/x/sys v0.37.0: BSD, see licenses/x-sys.txt.
 libadb-android 3.1.1: Copyright 2021 Muntashir Al-Islam. Apache-2.0 option selected. https://github.com/MuntashirAkon/libadb-android/tree/3.1.1
 spake2-android 2.2.1: Copyright 2021 Muntashir Al-Islam. LGPL-3.0. Exact corresponding upstream source: licenses/spake2-2.2.1-source.zip and https://github.com/MuntashirAkon/spake2-java/tree/7615ddd680b990e14513ebb66eac4cb0dbf82464
@@ -21,3 +21,5 @@ and ionfilesystem-android 1.1.1 LICENSE documents. Complete pinned source ZIPs a
 in that directory. Select libadb Apache-2.0 where its dual-license grant permits;
 retain per-file BSD/MIT obligations. Ion filesystem is MIT. Binary reproduction
 and store compatibility remain unverified; these sources do not change LGPL spake2.
+
+The native supplement also preserves exact iadb-ios, ionfilesystem-ios and Capacitor SwiftPM wrapper licenses, and actual BSD-3-Clause license bytes for all five locked Go modules. go-sources.json records Go-verified module/go.mod checksums. The Capacitor SwiftPM repository contains binary targets; its wrapper archive is not the implementation source. sources.json separately identifies Capacitor 8.5.3 implementation revision and both binary checksums. Reproduction remains unverified.

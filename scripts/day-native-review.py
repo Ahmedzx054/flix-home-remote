@@ -1,6 +1,6 @@
 """Capture resolved native dependency evidence after packing, without devices or credentials."""
 from pathlib import Path
-import hashlib, json, os, shutil, subprocess, sys, xml.etree.ElementTree as ET
+import hashlib, json, os, plistlib, shutil, subprocess, sys, zipfile, xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
 PROJECT = ROOT / 'Flix-Remote'
@@ -50,6 +50,23 @@ def main():
         if not locks: raise RuntimeError('Missing resolved SwiftPM graph')
         result['swiftpm'] = [{'path': p.relative_to(PROJECT).as_posix(), 'sha256': hashlib.sha256(p.read_bytes()).hexdigest(),
                               'resolved': json.loads(p.read_text())} for p in locks]
+        # Check the actual packed app, not only the staged source. Store review
+        # still has to assess these declarations against the running services.
+        ipas = sorted((PROJECT / 'build/day/dist').glob('*.ipa'))
+        if len(ipas) != 1: raise RuntimeError('Expected exactly one packed iOS IPA')
+        expected = plistlib.loads((ROOT / 'ios/App/App/PrivacyInfo.xcprivacy').read_bytes())
+        if not expected.get('NSPrivacyCollectedDataTypes'):
+            raise RuntimeError('Account and support collection must be declared')
+        with zipfile.ZipFile(ipas[0]) as archive:
+            manifests = [n for n in archive.namelist() if n.startswith('Payload/')
+                         and len(Path(n).parts) == 3 and n.endswith('.app/PrivacyInfo.xcprivacy')]
+            if len(manifests) != 1: raise RuntimeError('Missing main-app privacy manifest')
+            raw = archive.read(manifests[0])
+        actual = plistlib.loads(raw)
+        if actual != expected: raise RuntimeError('Packed privacy manifest differs from reviewed source')
+        result['packaged_privacy'] = {'ipa_sha256': hashlib.sha256(ipas[0].read_bytes()).hexdigest(),
+            'manifest_sha256': hashlib.sha256(raw).hexdigest(), 'matches_source': True,
+            'declarations': actual, 'privacy_approval': False}
     else:
         return
     result['go_version'] = run(['go', 'version'], ROOT / 'sshcore').strip()
