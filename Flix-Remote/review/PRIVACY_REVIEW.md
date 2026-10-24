@@ -56,10 +56,10 @@ https://developer.apple.com/documentation/technotes/tn3184-adding-data-collectio
    selected package hosts, account presence and exports require accurate processor
    and store data disclosures. The policy now describes those actual paths.
 
-The actual unsigned IPA from source `b4ba7a064199a9956f8eae3a4371fa94577812a8`,
-CI `40102532546`, was inspected after checking its artifact ZIP against GitHub's
+The actual unsigned IPA from source `ec9ba1f1d59ba3fa013789d22f4a7d7850485d96`,
+CI `40105116949`, was inspected after checking its artifact ZIP against GitHub's
 SHA-256 digest and CRC. IPA SHA-256:
-`7c4d36c213dc87db070623680dea1015e8c4db32304f3340f58610fb1d7a574d`.
+`968c923f35b882b8ced6e03183d04f2340f69e89cdb6357855b7ad283782efb8`.
 Its main manifest matches the source byte-for-byte (SHA-256
 `1f5ef577e97adb3b72e91f86d8e0d71c722149e3227c965205a239196739d236`),
 including all nine collected-data types, linked for app functionality. It declares

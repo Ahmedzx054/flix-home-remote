@@ -31,7 +31,7 @@ native build artifacts. POM claims are evidence inputs, not a compatibility verd
 Exact Maven source revisions, build environments, reproduced outputs and matching
 binary verification must be supplied before App Fair submission.
 
-The current `b4ba7a0` build supplies `native/review-android-mdc.json`:
+The current `ec9ba1f` build (CI `40105116949`) supplies `native/review-android-mdc.json`:
 79 external Maven files with SHA-256 and POM metadata, plus the full 88-node
 resolved graph. `libadb-android` calls its license "Other" and `ionfilesystem-android`
 calls it "License"; those labels are not a license grant. The new candidate
@@ -44,7 +44,7 @@ the actual license/copyright documents and hashes are bundled under
 BSD/MIT documents; it does not relabel every file Apache or prove reproduction. Zero Maven files have
 verified source-to-binary reproduction. `native/review-ios-uikit.json` supplies
 the exact three SwiftPM pins and lock hash, alongside the six-entry Go module
-lists (including the main module). CI `40102532546` now establishes module and
+lists (including the main module). CI `40105116949` establishes module and
 go.mod content sums for all five downloaded locked modules on both platforms.
 The resolved Android runtime records actual Gradle `9.6.1`, JDK `21.0.12.1`
 (Eclipse Adoptium) and Go `1.25.0`; iOS records Go `1.27.3`.
@@ -53,6 +53,19 @@ runtime report supplies that missing measurement without rewriting buildinfo.
 These inputs do not prove matching source-to-binary reproduction.
 `native/NATIVE_SUMMARY.json` and the copied buildinfo files preserve this evidence;
 all three APK/AAB/unsigned IPA hashes were checked against their buildinfo.
+
+`scripts/day-maven-source-evidence.py` also resolves all 74 distinct Maven
+coordinates covering those 79 measured binary files to their versioned source
+JARs on Google Maven, Maven Central or the publishing JitPack repository.
+All 74 downloaded JARs passed CRC and SHA-256 checks (14,319,569 bytes total).
+`native/MAVEN_REPRODUCTION_WORKLIST.json` links each binary's measured hash to
+the source URL/hash and POM evidence. Eighteen original embedded notice documents
+are preserved verbatim in `public/licenses/native/maven-embedded-notices.txt`.
+The local source JARs are evidence downloads, not additional runtime dependencies.
+These source JARs do not establish exact VCS revisions or reproduced binaries:
+the worklist deliberately leaves revision, build and reproduction approvals false.
+This worklist and its eighteen embedded notices were collected after the measured
+runtime build; the new notice asset is not claimed to be present in that IPA/APK.
 
 ## Assets and content
 

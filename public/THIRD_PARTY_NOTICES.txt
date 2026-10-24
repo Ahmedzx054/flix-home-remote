@@ -23,3 +23,10 @@ retain per-file BSD/MIT obligations. Ion filesystem is MIT. Binary reproduction
 and store compatibility remain unverified; these sources do not change LGPL spake2.
 
 The native supplement also preserves exact iadb-ios, ionfilesystem-ios and Capacitor SwiftPM wrapper licenses, and actual BSD-3-Clause license bytes for all five locked Go modules. go-sources.json records Go-verified module/go.mod checksums. The Capacitor SwiftPM repository contains binary targets; its wrapper archive is not the implementation source. sources.json separately identifies Capacitor 8.5.3 implementation revision and both binary checksums. Reproduction remains unverified.
+
+Maven source evidence (2026-10-24): licenses/native/maven-embedded-notices.txt
+preserves eighteen original notice documents from 74 versioned source JARs.
+Flix-Remote/review/native/MAVEN_REPRODUCTION_WORKLIST.json maps all 79 measured
+binary files to those source archive hashes and their original POM evidence.
+These are source collection inputs; exact VCS/build provenance, complete
+transitive license approval and matching binary reproduction remain unverified.
