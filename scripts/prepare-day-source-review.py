@@ -17,8 +17,12 @@ def main():
     files = {f.relative_to(ROOT).as_posix(): f.read_bytes() for f in source.source_files(ROOT)}
     # Only this workflow is used for the experimental branch, never the old IPA workflow.
     files = {n: b for n, b in files.items() if not n.startswith('.github/workflows/') and n != 'src/build-info.ts'}
-    # Only isolated tests; live household/device scripts are deliberately not exported or run.
+    # These two tests belong to the private browser-server checkout, not the phone client.
+    # Keep their full-workspace checks intact; never replace them with copied mock server code.
+    server_tests = {'browser-packages.test.ts', 'remote-background.test.ts'}
+    # Only isolated client tests; live household/device scripts are not exported or run.
     for f in (ROOT / 'tests').glob('*.test.ts'):
+        if f.name in server_tests: continue
         files[f.relative_to(ROOT).as_posix()] = f.read_bytes()
     for f in (ROOT / 'tests/fixtures').rglob('*'):
         if f.is_file(): files[f.relative_to(ROOT).as_posix()] = f.read_bytes()
@@ -46,6 +50,7 @@ def main():
         p = app / n; p.parent.mkdir(parents=True, exist_ok=True); p.write_bytes(b)
         manifest.append({'path': n, 'bytes': len(b), 'sha256': hashlib.sha256(b).hexdigest()})
     metadata = {'files': manifest, 'selection': 'existing client allowlist plus Day project; no build artifacts or server account data',
+                'workspace_only_tests': sorted(server_tests),
                 'secret_scan': 'filename rules and four high-confidence patterns; not a complete audit',
                 'tv_connections': 0, 'video_server_changes': 0, 'paid_enrollments': 0}
     (OUT / 'SOURCE_MANIFEST.json').write_text(json.dumps(metadata, indent=2) + '\n')

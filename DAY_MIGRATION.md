@@ -29,6 +29,11 @@ receipt is evidence of exact input bytes only. Do not call it a mobile build or 
 successful television interaction. No owner phone or household TV is launched by
 the verification workflow. No production service is restarted or deployed.
 
+The full workspace has 55 isolated checks. The standalone phone repository has 50:
+two private browser-server test files (five checks) stay in the full workspace,
+because they exercise server sources outside this public client repository.
+They are not replaced by fixtures or counted as passing in the standalone suite.
+
 ## App Fair gates
 
 The public source-review branch is `codex/day-appfair` in `Ahmedzx054/flix-home-remote`.
