@@ -3,6 +3,8 @@ import { Capacitor } from '@capacitor/core';
 import { platformNames, type Device, type Capabilities, type TvApp, type Setting, type PackageEntry, type InstallReceipt, type TvActivity, type Command } from './model.ts';
 import { directApi, initDirect, forgetDirect, discoveryDiagnostics } from './direct/engine.ts';
 import { mountOriginalRemote } from './remote-page/mount.ts';
+import { originalSurface, connectOriginalHost } from './remote-page/bootstrap.ts';
+import type { PageHost } from './remote-page/bridge.ts';
 import './style.css';
 import * as support from './support.ts';
 import { VERSION, BUILD_ID } from './build-info.ts';
@@ -322,11 +324,13 @@ render();
 // Mount the bundled remote before native storage, account verification or LAN
 // initialization. None of those asynchronous services is a rendering dependency.
 if (!new URLSearchParams(location.search).has('utility')) {
-  originalRemote=await mountOriginalRemote({api,household:support.household,selected:()=>selected,select:id=>{selected=id;},record:(stage,ok,message,id)=>support.record(stage,ok?'ok':'failed',message,id),open:(action,host)=>{
+  const pageHost:PageHost={api,household:support.household,selected:()=>selected,select:id=>{selected=id;},record:(stage,ok,message,id)=>support.record(stage,ok?'ok':'failed',message,id),open:(action,host)=>{
     void run(async()=>{if(action==='problem'){if(!support.account){showLogin();return;}await support.syncSupport(snapshot(),{problem:'ضغط صاحب الجوال: فيه مشكلة'});status('وصل تشخيص هذا الجوال. اشرح المشكلة في محادثتك مع المسؤول.');return;}if(online&&action!=='support')await refreshDevices();if(host){const d=devices.find(d=>d.host===host);if(d)selected=d.id;}
     sheetOpen=!['pair','manual'].includes(action);tab=action==='support'?'support':action==='library'?'library':action==='settings'?'settings':'remote';if(action!=='support')await loadDetails();if(action==='library')await refreshCatalog();render();
     if(action==='pair')showPair();else if(action==='manual'){root.querySelector<HTMLButtonElement>('[data-action="manual"]')?.click();const input=root.querySelector<HTMLInputElement>('input[name="host"]');if(input&&host)input.value=host;}});
-  }});
+  }};
+  connectOriginalHost(pageHost);
+  originalRemote=originalSurface||await mountOriginalRemote(pageHost);
   render();
 }
 await support.initSupport();
