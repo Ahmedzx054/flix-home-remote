@@ -35,6 +35,9 @@ private final class DayRemoteView: UIControl {
         controller = DayRemoteController(assets: assets)
         super.init(frame: .zero)
         accessibilityIdentifier = "flix-remote-surface"
+        // Start the bundled WKWebView load while Day lays out/attaches the Piece.
+        // It remains unready until real containment, layout and page paint pass.
+        controller.loadViewIfNeeded()
     }
     required init?(coder: NSCoder) { fatalError("Use the bundled asset initializer") }
     override func didMoveToWindow() {
@@ -73,10 +76,11 @@ private final class DayRemoteView: UIControl {
             }
             return
         }
-        let script = "(() => { const f = document.getElementById('original-remote'); const d = f?.contentDocument; const p = d?.getElementById('tvPick'); const r = f?.getBoundingClientRect(); return !!(p && p.getBoundingClientRect().width > 100 && innerWidth > 200 && innerHeight > 200 && f.dataset.flixPainted === 'true' && !document.querySelector('dialog[open]') && !d.querySelector('dialog[open]') && !document.body.classList.contains('native-sheet-open') && document.elementFromPoint(r.x+r.width/2,r.y+Math.min(30,r.height/2)) === f); })()"
+        let script = "(() => { const f = document.getElementById('original-remote'); const d = f?.contentDocument; const p = d?.getElementById('tvPick'); const r = f?.getBoundingClientRect(); return {control:!!p,controlWidth:p?.getBoundingClientRect().width||0,width:innerWidth,height:innerHeight,painted:f?.dataset.flixPainted==='true',overlay:!!document.querySelector('dialog[open]')||!!d?.querySelector('dialog[open]')||document.body.classList.contains('native-sheet-open'),hit:!!r&&document.elementFromPoint(r.x+r.width/2,r.y+Math.min(30,r.height/2))===f}; })()"
         web.evaluateJavaScript(script) { [weak self] value, error in
             guard let self, self.window != nil, generation == self.probeGeneration else { return }
-            self.pageReady = (value as? Bool == true) && self.bounds.width > 200 && self.bounds.height > 200
+            let state = value as? [String: Any] ?? [:]
+            self.pageReady = state["control"] as? Bool == true && (state["controlWidth"] as? Double ?? 0) > 100 && (state["width"] as? Double ?? 0) > 200 && (state["height"] as? Double ?? 0) > 200 && state["painted"] as? Bool == true && state["overlay"] as? Bool == false && state["hit"] as? Bool == true && self.bounds.width > 200 && self.bounds.height > 200
             if self.pageReady {
                 NSLog("FLIX original remote DOM and native frame ready (probe %d)", attempt)
             } else {

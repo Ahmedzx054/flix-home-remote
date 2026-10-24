@@ -93,11 +93,16 @@ public final class DayRemoteView extends FrameLayout {
                             if (bridge == null || !host.isAttachedToWindow() || generation != host.probeGeneration) return;
                             host.pageReady = true;
                             web.invalidate();
-                            android.util.Log.i("day-android", "FLIX original remote DOM, native frame and compositor ready");
+                            android.util.Log.i("Day", "FLIX original remote DOM, native frame and compositor ready; probe=" + attempt);
                         }
                     });
-                } else if (attempt < 120) web.postDelayed(() -> checkPage(attempt + 1), 250);
-                else android.util.Log.e("day-android", "FLIX original remote did not render in its native frame");
+                } else {
+                    if (attempt == 10 || attempt == 20 || attempt == 40 || attempt == 120) {
+                        web.evaluateJavascript("JSON.stringify((()=>{const f=document.getElementById('original-remote'),d=f?.contentDocument,p=d?.getElementById('tvPick'),r=f?.getBoundingClientRect();return {state:document.readyState,control:!!p,controlWidth:p?.getBoundingClientRect().width||0,width:innerWidth,height:innerHeight,painted:f?.dataset.flixPainted,overlay:!!document.querySelector('dialog[open]')||!!d?.querySelector('dialog[open]')||document.body.classList.contains('native-sheet-open'),hit:!!r&&document.elementFromPoint(r.x+r.width/2,r.y+Math.min(30,r.height/2))===f};})())", state -> android.util.Log.i("Day", "FLIX readiness pending; probe=" + attempt + "; native=" + web.getWidth() + "x" + web.getHeight() + "; page=" + state));
+                    }
+                    if (attempt < 120) web.postDelayed(() -> checkPage(attempt + 1), 250);
+                    else android.util.Log.e("Day", "FLIX original remote did not render in its native frame");
+                }
             });
         }
         @Override public void onStart() { super.onStart(); if (bridge != null) bridge.onStart(); }
