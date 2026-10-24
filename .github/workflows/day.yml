@@ -2,9 +2,10 @@ name: Day migration candidate
 on:
   push:
     branches: [codex/day-appfair]
-  pull_request:
-    paths: ['Flix-Remote/**', 'src/**', 'scripts/**', 'package*.json', '.github/workflows/day.yml']
   workflow_dispatch:
+concurrency:
+  group: day-candidate-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: write
   pages: write

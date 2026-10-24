@@ -52,16 +52,16 @@ mod uikit {
 #[cfg(all(feature = "mdc", target_os = "android"))]
 mod android {
     use super::*;
-    use day_mdc::{AHandle, Android};
+    use day_android::{AHandle, Android};
     use day_spec::NodeId;
-    day_mdc::java_class! {
+    day_android::java_class! {
         DayRemoteView => com.flix.homeremote.DayRemoteView,
         methods { static fn create() -> android.view.View, },
     }
     fn make(_: &mut Android, _: &RemoteProps, _: NodeId) -> AHandle {
-        day_mdc::realize("flix-remote", DayRemoteView::create)
+        day_android::realize("flix-remote", DayRemoteView::create)
     }
-    day_pieces::renderer!(day_mdc::RENDERERS, Android,
+    day_pieces::renderer!(day_android::RENDERERS, Android,
         kind: KIND, props: RemoteProps, make: make, measure: day_pieces::fill_measure);
 }
 
