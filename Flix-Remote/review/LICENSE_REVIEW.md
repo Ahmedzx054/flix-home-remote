@@ -34,11 +34,20 @@ binary verification must be supplied before App Fair submission.
 The current `bc5ba23` build now supplies `native/review-android-mdc.json`:
 79 external Maven files with SHA-256 and POM metadata, plus the full 88-node
 resolved graph. `libadb-android` calls its license "Other" and `ionfilesystem-android`
-calls it "License"; those labels are not a license grant. Zero Maven files have
+calls it "License"; those labels are not a license grant. The new candidate
+repairs those two grants using exact upstream source: libadb-android 3.1.1 at
+`c849886ebc6d48e7b46d967e78a6bb65c90c3b74` (Apache-2.0 alternative to GPL),
+and ionfilesystem-android 1.1.1 at
+`ad4c23981b63fdf60627e23a94187076997fc82b` (MIT). Their complete source ZIPs,
+six actual license/copyright documents and hashes are bundled under
+`public/licenses/native/`. This preserves upstream notices, including embedded
+BSD/MIT documents; it does not relabel every file Apache or prove reproduction. Zero Maven files have
 verified source-to-binary reproduction. `native/review-ios-uikit.json` supplies
 the exact three SwiftPM pins and lock hash, alongside the six-entry Go module
-lists (including the main module). Some Go entries lack sums in the resolved
-list and the buildinfo Gradle version is empty. These are explicit completeness
+lists (including the main module). The old build's resolved Go list lacks some sums and its buildinfo Gradle
+version is empty. The new collector additionally downloads the locked Go graph
+for module/go.mod sums and records actual Gradle/JVM versions in runtime evidence;
+new CI must establish those outputs. These are explicit completeness
 gaps, not evidence that matching source/build environments have been established.
 `native/NATIVE_SUMMARY.json` and the copied buildinfo files preserve this evidence;
 all three APK/AAB/unsigned IPA hashes were checked against their buildinfo.

@@ -13,6 +13,12 @@ def main():
     result = {'target': target, 'source_commit': os.environ.get('GITHUB_SHA'),
               'license_approval': False, 'binary_reproduction_verified': False,
               'physical_devices_tested': False, 'tv_connections': 0}
+    source_index = ROOT / 'public/licenses/native/sources.json'
+    result['additional_native_sources'] = json.loads(source_index.read_text())
+    for source in result['additional_native_sources']:
+        archive = source_index.parent / source['source_file']
+        if hashlib.sha256(archive.read_bytes()).hexdigest() != source['sha256']:
+            raise RuntimeError('Native source archive hash mismatch: ' + archive.name)
     if target == 'android-mdc':
         android = PROJECT / 'platform/android'
         wrapper = android / ('gradlew.bat' if os.name == 'nt' else 'gradlew')
@@ -47,7 +53,16 @@ def main():
     else:
         return
     result['go_version'] = run(['go', 'version'], ROOT / 'sshcore').strip()
+    # Download exactly the go.mod/go.sum graph so even lazily loaded modules
+    # have verifiable content checksums; this never marks a binary reproduced.
+    downloads = run(['go', 'mod', 'download', '-json', 'all'], ROOT / 'sshcore').strip()
     decoder = json.JSONDecoder()
+    result['go_downloads'] = []
+    while downloads:
+        value, end = decoder.raw_decode(downloads)
+        if value.get('Error'): raise RuntimeError(value['Error'])
+        result['go_downloads'].append({k: value[k] for k in ['Path', 'Version', 'Sum', 'GoModSum'] if k in value})
+        downloads = downloads[end:].strip()
     modules = run(['go', 'list', '-m', '-json', 'all'], ROOT / 'sshcore').strip()
     result['go_modules'] = []
     while modules:

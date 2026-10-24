@@ -16,6 +16,13 @@ The final 60,000-byte envelope limit remains. `tests/support.test.ts` checks nes
 secrets, malformed inputs, short credentials, useful retained fields and UTF-8
 size. Free-text filtering cannot prove the absence of every possible secret.
 
+The current repair also enforces on-device speech in the iOS plugin, rejecting
+voice input if local recognition is unavailable, and adds seven-day pruning of
+local events, pending results and problem text. The clear-local-diagnostics
+control stops sharing and removes the phone copy. It does not erase the server
+report. Retention tests reject expired, future and non-finite timestamps. These
+source changes need the new native build; they are not claims about the old IPA.
+
 ## Findings blocking store qualification
 
 1. **Automatic account inventory.** `support.ts:accessGate` sends installation,
@@ -36,7 +43,7 @@ size. Free-text filtering cannot prove the absence of every possible secret.
 4. **Cloud execution boundary.** `updates.ts` checks manifest hashes/compatibility,
    not an independent signature. `mount.ts` permits scripts and same-origin. That
    iframe is not a security isolation boundary. Eligibility remains unresolved.
-5. **Speech/external services.** Speech is not forced on-device. Search, artwork,
+5. **Speech/external services.** iOS speech is now forced on-device in this candidate; Android provider speech may still use external processing. Search, artwork,
    selected package hosts, account presence and exports require accurate processor
    and store data disclosures. The policy now describes those actual paths.
 

@@ -1,0 +1,54 @@
+[
+  {
+    "name": "libadb-android",
+    "version": "3.1.1",
+    "repository": "https://github.com/MuntashirAkon/libadb-android",
+    "revision": "c849886ebc6d48e7b46d967e78a6bb65c90c3b74",
+    "source_url": "https://codeload.github.com/MuntashirAkon/libadb-android/zip/c849886ebc6d48e7b46d967e78a6bb65c90c3b74",
+    "source_file": "libadb-android-3.1.1-source.zip",
+    "sha256": "236fe2cc16577a0dceccf594ed6f3ada7d09f84d203f95210321932fbbf69abe",
+    "licenses": "Apache-2.0 OR GPL-3.0-or-later",
+    "selected_alternative": "Apache-2.0",
+    "documents": [
+      {
+        "path": "COPYING",
+        "sha256": "dd5314a7504dc2c80aba35db43a8db2f9362bd5768af07e94539a3e2b6fc3275"
+      },
+      {
+        "path": "LICENSES/Apache-2.0",
+        "sha256": "4557de501c3a82094c239a4d74e2e29993c188f6ebb28b668fedf942938e44f1"
+      },
+      {
+        "path": "LICENSES/BSD-3-Clause",
+        "sha256": "8a094def3661adcb92d2e9f462052fe2bd6365ecf659f229ae9703bd4c412024"
+      },
+      {
+        "path": "LICENSES/GPL-3.0-or-later",
+        "sha256": "4cf69a0c7c6f0eea4f323a85554a11cd2e16fa2a92c97a2d5de1d2c696d8e597"
+      },
+      {
+        "path": "LICENSES/MIT",
+        "sha256": "57a5669100695db12465be9fb3995322e87da6aa64d06cccdbccbb53b1839821"
+      }
+    ],
+    "binary_reproduction_verified": false
+  },
+  {
+    "name": "ionfilesystem-android",
+    "version": "1.1.1",
+    "repository": "https://github.com/ionic-team/ion-android-filesystem",
+    "revision": "ad4c23981b63fdf60627e23a94187076997fc82b",
+    "source_url": "https://codeload.github.com/ionic-team/ion-android-filesystem/zip/ad4c23981b63fdf60627e23a94187076997fc82b",
+    "source_file": "ionfilesystem-android-1.1.1-source.zip",
+    "sha256": "4939a2f5079c6ca74489153fc726a50f5c85332992f9b53f565024ed9bec0414",
+    "licenses": "MIT",
+    "selected_alternative": "MIT",
+    "documents": [
+      {
+        "path": "LICENSE",
+        "sha256": "de884404585ed20280150b0768082b6004d3548aaa0d6e596d6bfa0538ab331d"
+      }
+    ],
+    "binary_reproduction_verified": false
+  }
+]

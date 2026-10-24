@@ -37,6 +37,8 @@ function supportPanel() {
   ${button(support.account ? 'report-problem' : 'login', support.account ? 'فيه مشكلة · مشاركة التشخيص' : 'تسجيل الدخول بحساب FLIX', 'class="primary full"')}
   ${support.sharing ? `<p class="notice">التشخيص متصل أثناء بقاء التطبيق مفتوحًا. ${grant ? 'التحكم مسموح على الشاشة المختارة لمدة محدودة.' : 'إرسال التشخيص لا يمنح إذن تغيير التلفزيون.'}</p>${grant ? button('revoke-control','إيقاف التحكم فورًا','class="quiet full"') : television()?.paired ? button('grant-control','السماح بإصلاح الشاشة 15 دقيقة','class="quiet full"') : ''}${button('poll-support','تحديث التشخيص','class="text-button full"')}${button('stop-support','إيقاف مشاركة التشخيص','class="text-button full"')}` : ''}
   <p class="fine" role="status">${escape(support.supportMessage)}</p>
+  <p class="fine">تُحذف سجلات التشخيص المحلية الأقدم من 7 أيام عند فتح التطبيق أو حفظ تشخيص جديد. المسح أدناه يوقف المشاركة ويمسح نسخة الجوال؛ البلاغ الذي أُرسل للخادم يبقى لدى الدعم. الإملاء في نسخة الآيفون محلي فقط؛ إن لم يتوفر استخدم الكتابة.</p>
+  ${button('clear-local-diagnostics','مسح التشخيص المحفوظ على الجوال','class="text-button full"')}
   ${support.actions.map(a => `<article class="support-action"><p>${escape(a.message)}</p><button data-support="${escape(a.id)}" class="primary">مراجعة الإجراء</button><button data-dismiss="${escape(a.id)}" class="quiet">رفض</button></article>`).join('')}
   <p class="fine">إغلاق التطبيق أو نقله للخلفية ينهي إذن التحكم. التثبيت والاقتران وإطفاء الشاشة تحتاج موافقة مستقلة.</p></section>`;
 }
@@ -178,6 +180,7 @@ root.addEventListener('click', event => {
   if (action === 'close') { closeDialog(); return; }
   if (action === 'support') { tab = 'support'; sheetOpen=true; render(); return; }
   if (action === 'login') { showLogin(); return; }
+  if (action === 'clear-local-diagnostics') { void run(async()=>{await support.clearLocalDiagnostics();render();}); return; }
   if (action === 'grant-control') { const d = television(); if (!d?.paired) return; dialog('السماح بالتحكم عن بُعد', `<p>السماح للدعم لمدة 15 دقيقة بالتحكم في <strong>${escape(d.name)}</strong>، وفتح تطبيقاتها وتغيير إعداداتها المتاحة. قد تتغير الصورة والصوت أثناء الجلسة. أبقِ الجوال مفتوحًا على نفس Wi-Fi.</p><form data-form="grant-control"><input type="hidden" name="deviceId" value="${escape(d.id)}"><input type="hidden" name="consent" value="on"><p>بالضغط على بدء الجلسة توافق على هذا التحكم؛ يمكنك إيقافه فورًا.</p><button class="primary">بدء جلسة التحكم</button></form>`); return; }
   if (action === 'revoke-control' || action === 'stop-support') { support.revokeControl(); if (action === 'stop-support') { void support.stopSharing().then(render); } else { void support.syncSupport(snapshot()).catch(() => undefined); render(); } return; }
   if (target.dataset.support) { void run(async () => reviewSupport(target.dataset.support!)); return; }
@@ -316,9 +319,8 @@ async function serviceSupport() {
   finally { supportPolling = false; }
 }
 render();
-await support.initSupport();
-render();
-await reconnect();
+// Mount the bundled remote before native storage, account verification or LAN
+// initialization. None of those asynchronous services is a rendering dependency.
 if (!new URLSearchParams(location.search).has('utility')) {
   originalRemote=await mountOriginalRemote({api,household:support.household,selected:()=>selected,select:id=>{selected=id;},record:(stage,ok,message,id)=>support.record(stage,ok?'ok':'failed',message,id),open:(action,host)=>{
     void run(async()=>{if(action==='problem'){if(!support.account){showLogin();return;}await support.syncSupport(snapshot(),{problem:'ضغط صاحب الجوال: فيه مشكلة'});status('وصل تشخيص هذا الجوال. اشرح المشكلة في محادثتك مع المسؤول.');return;}if(online)await refreshDevices();if(host){const d=devices.find(d=>d.host===host);if(d)selected=d.id;}
@@ -327,6 +329,9 @@ if (!new URLSearchParams(location.search).has('utility')) {
   }});
   render();
 }
+await support.initSupport();
+render();
+await reconnect();
 if (Capacitor.isNativePlatform()) {
   closeDialog(); if(!originalRemote)void run(scan);
   void App.addListener('appStateChange', ({ isActive }) => { if (isActive) void reconnect().then(() => run(scan)); else { support.revokeControl(); void support.stopSharing(); } });

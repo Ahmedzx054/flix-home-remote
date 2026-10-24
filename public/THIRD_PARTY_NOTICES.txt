@@ -13,3 +13,11 @@ Node dependency license texts: licenses/node-dependencies.txt
 Day Cargo and npm runtime license documents: licenses/day-transitive-notices.txt, mapped by document hash in Flix-Remote/review/dependencies.json. MIT licenses on FLIX files do not relicense upstream components. Day and the modified DayActivity remain MPL-2.0; LGPL dependencies remain LGPL-3.0. Native runtime graphs and Maven reproduction remain release gates.
 License copies are bundled under licenses/.
 The Day Android candidate changes the generated DayActivity superclass from FragmentActivity to AppCompatActivity, which extends FragmentActivity, to preserve Capacitor/Cordova compatibility. DayActivity retains its MPL-2.0 license and original lifecycle implementation. platform/android/app/build.gradle.kts records before/after hashes in build/bridge/day-activity-adapter.json; Cargo checkout and Capacitor npm sources remain unchanged. Corresponding Day source: https://github.com/daybrite/day/tree/2c787ecae32a59cf58260aca95b51a4b1bd98d41/toolkits/day-android/java .
+
+Native source grant supplement (2026-10-24):
+public/licenses/native/sources.json records pinned upstream revisions and SHA-256.
+public/licenses/native/notices.txt preserves actual libadb-android 3.1.1 COPYING/LICENSES
+and ionfilesystem-android 1.1.1 LICENSE documents. Complete pinned source ZIPs are
+in that directory. Select libadb Apache-2.0 where its dual-license grant permits;
+retain per-file BSD/MIT obligations. Ion filesystem is MIT. Binary reproduction
+and store compatibility remain unverified; these sources do not change LGPL spake2.
