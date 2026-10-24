@@ -18,7 +18,10 @@ def main():
         wrapper = android / ('gradlew.bat' if os.name == 'nt' else 'gradlew')
         gradle = str(wrapper) if wrapper.is_file() else shutil.which('gradle')
         if not gradle: raise RuntimeError('Gradle not available; native review must not be skipped')
-        subprocess.run([gradle, ':app:flixDependencyReview', '-q', '--console=plain'], cwd=android, check=True)
+        # This evidence-only task inspects the live resolved Gradle model. It
+        # must not reuse/serialize that model through the configuration cache.
+        # Native build/pack and all qualification failures remain unchanged.
+        subprocess.run([gradle, ':app:flixDependencyReview', '--no-configuration-cache', '-q', '--console=plain'], cwd=android, check=True)
         result['runtime'] = json.loads((PROJECT / 'build/bridge/native-runtime.json').read_text())
         cache = Path(os.environ.get('GRADLE_USER_HOME', str(Path.home() / '.gradle'))) / 'caches/modules-2/files-2.1'
         for artifact in result['runtime']['artifacts']:
