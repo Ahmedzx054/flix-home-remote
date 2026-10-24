@@ -121,5 +121,23 @@
         "sha256": "bdcd8eab2d62a077efd76c3c8b9629e65ae7043c1462289a1e55de9be19bbf1f"
       }
     ]
+  },
+  {
+    "name": "capacitor-implementation",
+    "version": "8.5.3",
+    "repository": "https://github.com/ionic-team/capacitor",
+    "revision": "06e3e1984337f836a4c28b2afc92faa977dea315",
+    "source_url": "https://codeload.github.com/ionic-team/capacitor/zip/06e3e1984337f836a4c28b2afc92faa977dea315",
+    "source_file": "capacitor-implementation-8.5.3-source.zip",
+    "sha256": "6892354083bb9d85820671508afed16b95887a3cb88928508677588a8c3f0f24",
+    "licenses": "MIT",
+    "selected_alternative": "MIT",
+    "documents": [
+      {
+        "path": "LICENSE",
+        "sha256": "9c6ebf3e5ab832ba4d5af38f340978e1fedbfee6e3d23662dfdb8917a9d864dd"
+      }
+    ],
+    "binary_reproduction_verified": false
   }
 ]

@@ -31,7 +31,7 @@ native build artifacts. POM claims are evidence inputs, not a compatibility verd
 Exact Maven source revisions, build environments, reproduced outputs and matching
 binary verification must be supplied before App Fair submission.
 
-The current `bc5ba23` build now supplies `native/review-android-mdc.json`:
+The current `b4ba7a0` build supplies `native/review-android-mdc.json`:
 79 external Maven files with SHA-256 and POM metadata, plus the full 88-node
 resolved graph. `libadb-android` calls its license "Other" and `ionfilesystem-android`
 calls it "License"; those labels are not a license grant. The new candidate
@@ -44,11 +44,13 @@ the actual license/copyright documents and hashes are bundled under
 BSD/MIT documents; it does not relabel every file Apache or prove reproduction. Zero Maven files have
 verified source-to-binary reproduction. `native/review-ios-uikit.json` supplies
 the exact three SwiftPM pins and lock hash, alongside the six-entry Go module
-lists (including the main module). The old build's resolved Go list lacks some sums and its buildinfo Gradle
-version is empty. The new collector additionally downloads the locked Go graph
-for module/go.mod sums and records actual Gradle/JVM versions in runtime evidence;
-new CI must establish those outputs. These are explicit completeness
-gaps, not evidence that matching source/build environments have been established.
+lists (including the main module). CI `40102532546` now establishes module and
+go.mod content sums for all five downloaded locked modules on both platforms.
+The resolved Android runtime records actual Gradle `9.6.1`, JDK `21.0.12.1`
+(Eclipse Adoptium) and Go `1.25.0`; iOS records Go `1.27.3`.
+Upstream Day buildinfo still has an empty Gradle-version field; the separate
+runtime report supplies that missing measurement without rewriting buildinfo.
+These inputs do not prove matching source-to-binary reproduction.
 `native/NATIVE_SUMMARY.json` and the copied buildinfo files preserve this evidence;
 all three APK/AAB/unsigned IPA hashes were checked against their buildinfo.
 
@@ -77,4 +79,4 @@ Neither SPDX metadata nor passing App Fair lint closes these obligations.
 
 ## Additional native repair in the current candidate
 
-The supplement now includes the exact three SwiftPM wrapper/source repositories and all five locked Go modules: five Git source ZIPs, fourteen real license documents, and Go-verified module and go.mod content sums. Unknown Go modules/versions fail the collector rather than inheriting an assumed license. The pinned `capacitor-swift-pm` package is explicitly a binary wrapper: its two XCFramework checksums are recorded, and the separate Capacitor implementation source is identified as 8.5.3 commit `06e3e1984337f836a4c28b2afc92faa977dea315`. Its wrapper archive is not claimed to be that implementation. Reproduction of these binary frameworks, Maven artifacts and transitive notice completeness remain gates.
+The supplement now includes the exact three SwiftPM wrapper/source repositories, the separate Capacitor implementation, and all five locked Go modules: six Git source ZIPs, fifteen real license documents, and Go-verified module and go.mod content sums. Unknown Go modules/versions fail the collector rather than inheriting an assumed license. The pinned `capacitor-swift-pm` package is explicitly a binary wrapper: its two XCFramework checksums are recorded, and the separate Capacitor implementation source is archived at 8.5.3 commit `06e3e1984337f836a4c28b2afc92faa977dea315`. Its wrapper archive is not claimed to be that implementation. Reproduction of these binary frameworks, Maven artifacts and transitive notice completeness remain gates.

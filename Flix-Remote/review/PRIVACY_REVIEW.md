@@ -52,16 +52,21 @@ https://developer.apple.com/documentation/technotes/tn3184-adding-data-collectio
 4. **Cloud execution boundary.** `updates.ts` checks manifest hashes/compatibility,
    not an independent signature. `mount.ts` permits scripts and same-origin. That
    iframe is not a security isolation boundary. Eligibility remains unresolved.
-5. **Speech/external services.** iOS speech is now forced on-device in this candidate; Android provider speech may still use external processing. Search, artwork,
+5. **Speech/external services.** Both native hosts now require on-device speech in this candidate. Android uses `createOnDeviceSpeechRecognizer` on API 31+, checks availability, requests microphone permission only for voice input, cancels/destroys recognition after 20 seconds or destruction, and rejects unavailable recognition instead of using a generic provider. This source repair still needs a matching native build and real-device speech acceptance. Search, artwork,
    selected package hosts, account presence and exports require accurate processor
    and store data disclosures. The policy now describes those actual paths.
 
-The actual current unsigned IPA (`0074d4b6…cfab54`) was also inspected. Its main
-manifest declares UserDefaults/file-timestamp reasons, no tracking domains and
-`NSPrivacyTracking=false`; it does not declare collected-data types. This does
-not mean the app collects no data: the account-linked inventory and optional
-diagnostics above still require accurate store privacy declarations and review.
-The package has no embedded provisioning profile and was not installed or signed.
+The actual unsigned IPA from source `b4ba7a064199a9956f8eae3a4371fa94577812a8`,
+CI `40102532546`, was inspected after checking its artifact ZIP against GitHub's
+SHA-256 digest and CRC. IPA SHA-256:
+`7c4d36c213dc87db070623680dea1015e8c4db32304f3340f58610fb1d7a574d`.
+Its main manifest matches the source byte-for-byte (SHA-256
+`1f5ef577e97adb3b72e91f86d8e0d71c722149e3227c965205a239196739d236`),
+including all nine collected-data types, linked for app functionality. It declares
+UserDefaults/file-timestamp reasons, no tracking domains and
+`NSPrivacyTracking=false`. This repairs the previous `0074d4b6…cfab54` package's
+missing collected-data declarations; it does not resolve the service behavior or
+store review findings above. The package was not installed or signed for a user.
 
 The source audit is completed; release privacy approval is blocked. Resolving these
 gates needs actual service/privacy behavior and App Fair review. Wording changes or

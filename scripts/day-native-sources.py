@@ -17,6 +17,8 @@ PINS = [
      '549c18ad9d9bb70d05df37cc3f6f7aa7f5d0ee52', 'MIT'),
     ('capacitor-swift-pm', '8.5.3', 'ionic-team/capacitor-swift-pm',
      '4c7f346d16196e21fbe23d4a7a6fc7af62af6742', 'MIT'),
+    ('capacitor-implementation', '8.5.3', 'ionic-team/capacitor',
+     '06e3e1984337f836a4c28b2afc92faa977dea315', 'MIT'),
 ]
 GO_REVIEWED = {'golang.org/x/crypto':'v0.43.0', 'golang.org/x/net':'v0.45.0',
                'golang.org/x/sys':'v0.37.0', 'golang.org/x/term':'v0.36.0',
