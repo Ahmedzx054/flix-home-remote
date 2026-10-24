@@ -1,0 +1,19 @@
+{
+  "META": {
+    "repoName": "FLIX Remote",
+    "repoIcon": "https://flix-admin-tan.vercel.app/home-remote/apps/s.png"
+  },
+  "Other": [
+    {
+      "name": "ريموت FLIX",
+      "version": "0.5.6",
+      "down": "https://flix-admin-tan.vercel.app/home-remote/ios-unsigned.ipa",
+      "category": "Utilities",
+      "description": "ريموت FLIX الأصلي لأجهزة iPhone وiPad بنظام iOS 17 أو أحدث. اكتشاف واقتران وتحكم مباشر بالأجهزة المتوافقة على Wi-Fi. تتطلب الوظائف موافقة الجهاز وصلاحياته. يوقّع Scarlet الحزمة؛ استمرار العمل مرتبط بصلاحية شهادة التوقيع.",
+      "bundleID": "com.flix.homeremote",
+      "icon": "https://flix-admin-tan.vercel.app/home-remote/apps/s.png",
+      "changelog": "0.5.6، البناء 12: حساب FLIX والإدارة الموحدة. تحديثات الواجهة المتوافقة تصل من السحابة عند فتح التطبيق؛ تغييرات المكونات الأصلية تحتاج تحديث الحزمة.",
+      "dev": "FLIX"
+    }
+  ]
+}
